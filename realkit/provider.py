@@ -23,6 +23,35 @@ except ImportError:  # Copied into the pinned OSWorld checkout by runner/setup.s
     from ports import PortBundle, reserve_port_bundle
 
 logger = logging.getLogger("desktopenv.providers.e2b")
+RELAY_ENV_KEYS = {
+    "ALL_PROXY",
+    "CURL_CA_BUNDLE",
+    "DYLD_LIBRARY_PATH",
+    "GUEST_READY_TIMEOUT_S",
+    "HOME",
+    "HTTPS_PROXY",
+    "HTTP_PROXY",
+    "LD_LIBRARY_PATH",
+    "NO_PROXY",
+    "PATH",
+    "PYTHONPATH",
+    "RELAY_HTTP_TIMEOUT_S",
+    "REQUESTS_CA_BUNDLE",
+    "SANDBOX_TIMEOUT_S",
+    "SSL_CERT_DIR",
+    "SSL_CERT_FILE",
+    "SYSTEMROOT",
+    "TMPDIR",
+    "VIRTUAL_ENV",
+}
+
+
+def _relay_environment() -> dict[str, str]:
+    return {
+        name: value
+        for name, value in os.environ.items()
+        if name in RELAY_ENV_KEYS or name.startswith("E2B_")
+    }
 
 
 class E2BProvider(Provider):
@@ -79,7 +108,7 @@ class E2BProvider(Provider):
         stderr = (attempt_dir / "relay.stderr.log").open("ab")
         self._relay_streams = [stdout, stderr]
         environment = {
-            **os.environ,
+            **_relay_environment(),
             "GUEST_TEMPLATE": path_to_vm,
             "E2B_RELAY_CONTROL_PORT": str(self.ports.control),
             "E2B_RELAY_SERVER_PORT": str(self.ports.server),

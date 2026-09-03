@@ -162,3 +162,39 @@ def test_provider_control_payload_does_not_persist_in_relay_event_path(tmp_path:
         }
     )
     assert "secret-api-key" not in public
+
+
+def test_relay_subprocess_does_not_inherit_model_credentials(tmp_path: Path) -> None:
+    captured_env = {}
+
+    def popen(*args, **kwargs):
+        captured_env.update(kwargs["env"])
+        return FakeProcess(*args, **kwargs)
+
+    with (
+        patch.object(provider.subprocess, "Popen", side_effect=popen),
+        patch.object(
+            provider.E2BProvider,
+            "_control",
+            return_value={"sandbox_id": "sandbox-1", "ready": True},
+        ),
+        patch.dict(
+            provider.os.environ,
+            {
+                "E2B_ATTEMPT_DIR": str(tmp_path),
+                "E2B_API_KEY": "e2b-secret",
+                "OPENAI_API_KEY": "model-secret",
+                "QWEN_ENDPOINT_0": "https://model.example/v1",
+                "PATH": "/usr/bin",
+            },
+            clear=True,
+        ),
+    ):
+        instance = provider.E2BProvider()
+        instance.start_emulator(IMMUTABLE_REF, True, "Ubuntu")
+        instance.stop_emulator(IMMUTABLE_REF)
+
+    assert captured_env["E2B_API_KEY"] == "e2b-secret"
+    assert captured_env["PATH"] == "/usr/bin"
+    assert "OPENAI_API_KEY" not in captured_env
+    assert "QWEN_ENDPOINT_0" not in captured_env

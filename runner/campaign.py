@@ -17,7 +17,12 @@ from pathlib import Path
 
 from realkit.contract import compare_results, load_contract, validate_contract
 from realkit.e2b_policy import require_immutable_template_ref
-from realkit.preflight import collect_redaction_values, redact_text, validate_capabilities
+from realkit.preflight import (
+    collect_environment_redaction_values,
+    collect_redaction_values,
+    redact_text,
+    validate_capabilities,
+)
 from realkit.results import AttemptEvent, RunLedger, TaskKey, catalog_artifacts
 from runner.profile import load_inventory, load_profiles
 
@@ -134,7 +139,16 @@ async def execute_campaign(
     suite = metadata.get("suite", inventory.get("suite", ""))
     capabilities = validate_capabilities(inventory["tasks"], suite, proxy_config, secret_mounts)
     metadata = {**metadata, "capabilities": capabilities.to_dict()}
-    sensitive_values = collect_redaction_values(proxy_config, secret_mounts)
+    sensitive_values = tuple(
+        sorted(
+            {
+                *collect_redaction_values(proxy_config, secret_mounts),
+                *collect_environment_redaction_values(os.environ, model_endpoints),
+            },
+            key=len,
+            reverse=True,
+        )
+    )
     run_root = Path(run_root)
     previous_max_observed_children = 0
     if (run_root / "run.json").exists():

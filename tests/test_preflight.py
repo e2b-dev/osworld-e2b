@@ -6,6 +6,7 @@ from pathlib import Path
 import pytest
 
 from realkit.preflight import (
+    collect_environment_redaction_values,
     collect_redaction_values,
     redact_text,
     sanitize_mount,
@@ -102,3 +103,19 @@ def test_redaction_covers_paths_json_secret_values_urls_and_api_keys(tmp_path: P
     assert "account:s3cret" not in redacted
     assert "e2b_1234567890abcdefghijklmnop" not in redacted
     assert "<redacted>" in redacted
+
+
+def test_environment_redaction_collects_secret_values_and_explicit_endpoints() -> None:
+    values = collect_environment_redaction_values(
+        {
+            "OPENAI_API_KEY": "provider-secret-value",
+            "MODEL_ACCESS_TOKEN": "endpoint-token-value",
+            "PATH": "/usr/bin",
+        },
+        ["https://user:token@model.example/v1"],
+    )
+
+    assert "provider-secret-value" in values
+    assert "endpoint-token-value" in values
+    assert "https://user:token@model.example/v1" in values
+    assert "/usr/bin" not in values

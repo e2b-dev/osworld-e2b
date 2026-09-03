@@ -17,6 +17,7 @@ PLACEHOLDERS = {
     "username",
 }
 GUEST_SECRET_ROOT = PurePosixPath("/opt/osworld/secrets")
+SECRET_ENV_NAME = re.compile(r"(?:^|_)(?:API_KEY|TOKEN|PASSWORD|SECRET)(?:_|$)")
 
 
 @dataclass(frozen=True)
@@ -134,6 +135,19 @@ def collect_redaction_values(
             values.update(_json_strings(json.loads(text)))
         except json.JSONDecodeError:
             pass
+    return tuple(sorted(values, key=len, reverse=True))
+
+
+def collect_environment_redaction_values(
+    environment: dict[str, str], explicit_values: list[str] | tuple[str, ...] = ()
+) -> tuple[str, ...]:
+    """Collect secret-like environment values without retaining their names or values."""
+    values = {value for value in explicit_values if len(value) >= 4}
+    values.update(
+        value
+        for name, value in environment.items()
+        if SECRET_ENV_NAME.search(name.upper()) and len(value) >= 4
+    )
     return tuple(sorted(values, key=len, reverse=True))
 
 
