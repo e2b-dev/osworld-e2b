@@ -14,6 +14,7 @@ FORBIDDEN_PARTS = {
     ".venv",
     "__pycache__",
     "artifacts",
+    "cache",
     "dist",
     "node_modules",
     "out",

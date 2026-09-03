@@ -9,7 +9,8 @@
   },
   "scripts": {
     "build": "tsx template/build.ts",
-    "typecheck": "tsc --noEmit --types node --module NodeNext --moduleResolution NodeNext --target ES2022 template/build.ts template/template.ts"
+    "test": "tsx --test tests/test_build_identity.ts",
+    "typecheck": "tsc --noEmit --types node --module NodeNext --moduleResolution NodeNext --target ES2022 template/build.ts template/identity.ts template/template.ts tests/test_build_identity.ts"
   },
   "dependencies": {
     "e2b": "2.46.1"

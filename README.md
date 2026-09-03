@@ -20,6 +20,22 @@ The implementation targets OSWorld commit `7a17d3abc86d524420ea4ec96752f84d245fe
 Every launch path requires an immutable `name:build_id` Template reference. A mutable Template name
 is rejected before sandbox creation.
 
+## Build identity
+
+`template/inputs.lock.json` pins the OSWorld commit and the Ubuntu base image by platform-specific
+digest. The guest Python environment is a complete transitive lock with artifact hashes, and npm
+uses `package-lock.json`. The build command hashes those inputs, the Template sources, all copied
+guest files, and the CPU and memory allocation into a deterministic recipe digest. It derives the
+Template name `osworld-gnome-<digest-prefix>` from that digest; callers cannot supply a mutable
+name.
+
+The recipe is not byte-reproducible. Ubuntu packages, Google Chrome stable, and the VS Code Debian
+download are resolved during the build as documented in `template/inputs.lock.json`. Each build
+records the recipe digest, per-input digests, unresolved inputs, and E2B build ID in the ignored
+`results/template-build.json` receipt. The guest also records the resolved Debian package inventory.
+Only the receipt's `name:build_id` is an immutable runnable artifact identity; a matching recipe
+digest alone does not identify identical output bytes.
+
 ## Local checks
 
 Python 3.11+, Node.js 20+, `uv`, and npm are required.
@@ -29,8 +45,10 @@ uv sync --locked --all-groups
 uv run pytest -q
 uv run ruff check .
 uv run ruff format --check .
+scripts/audit_python_dependencies.sh
 npm ci
 npm run typecheck
+npm test
 python3 scripts/check_public_tree.py
 ```
 
@@ -41,7 +59,7 @@ offline checks:
 cp .env.example .env.local
 export E2B_API_KEY='...'
 npm run build
-export GUEST_TEMPLATE='osworld-gnome:<build-id-from-build-output>'
+export GUEST_TEMPLATE='osworld-gnome-<recipe-digest-prefix>:<build-id-from-build-output>'
 
 runner/setup.sh
 uv run --with-requirements runner/OSWorld/requirements.txt \

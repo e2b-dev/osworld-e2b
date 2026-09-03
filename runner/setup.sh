@@ -3,14 +3,14 @@
 # wire in the E2B provider (realkit/provider.py + manager.py) so OSWorld's own
 # run.py works with --provider_name e2b. Idempotent: re-running is safe.
 #
-# Usage:  ./setup.sh [dest-dir]     (default: ./OSWorld)
+# Usage:  ./setup.sh [dest-dir]     (default: runner/OSWorld)
 # After:  see README.md in this directory for the run steps.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REALKIT="$HERE/../realkit"
 PIN=7a17d3abc86d524420ea4ec96752f84d245fea74
-DEST="${1:-$PWD/OSWorld}"
+DEST="${1:-$HERE/OSWorld}"
 UPSTREAM=https://github.com/xlang-ai/OSWorld.git
 
 if [ -e "$DEST" ] && [ ! -d "$DEST/.git" ]; then

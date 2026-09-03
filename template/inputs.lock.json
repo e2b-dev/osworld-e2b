@@ -1,0 +1,27 @@
+{
+  "schemaVersion": 1,
+  "platform": "linux/amd64",
+  "baseImage": {
+    "sourceTag": "ubuntu:22.04",
+    "reference": "ubuntu@sha256:79676deb51ebb02885b0b9d33788e78a37cf1045ad79d1bb04c6a222c3556b3d"
+  },
+  "osworld": {
+    "repository": "https://github.com/xlang-ai/OSWorld.git",
+    "commit": "7a17d3abc86d524420ea4ec96752f84d245fea74"
+  },
+  "byteReproducible": false,
+  "resolvedDuringBuild": [
+    {
+      "name": "Ubuntu apt packages",
+      "reason": "Ubuntu Jammy repositories resolve package versions when the Template is built."
+    },
+    {
+      "name": "Google Chrome stable",
+      "reason": "Google's rolling stable apt repository resolves the browser version when the Template is built."
+    },
+    {
+      "name": "VS Code 1.91.1 Debian package",
+      "reason": "The versioned download URL is not verified against a repository-owned content digest."
+    }
+  ]
+}

@@ -31,6 +31,8 @@ SANDBOX_TIMEOUT_S = int(os.environ.get("SANDBOX_TIMEOUT_S", "3600"))
 RELAY_HTTP_TIMEOUT_S = int(os.environ.get("RELAY_HTTP_TIMEOUT_S", "240"))
 READY_TIMEOUT_S = int(os.environ.get("GUEST_READY_TIMEOUT_S", "180"))
 CONTROL_PORT = int(os.environ.get("E2B_RELAY_CONTROL_PORT", "14999"))
+KILL_ATTEMPTS = int(os.environ.get("E2B_KILL_ATTEMPTS", "3"))
+KILL_RETRY_DELAY_S = float(os.environ.get("E2B_KILL_RETRY_DELAY_S", "0.1"))
 PORT_MAP = {15000: 5000, 19222: 9222, 18080: 8080}
 CDP_LOCAL = 19222
 
@@ -48,6 +50,8 @@ class Guest:
 class GuestManager:
     def __init__(self) -> None:
         self._guest: Optional[Guest] = None
+        self._stopped = False
+        self._pending_cleanup: dict[str, Sandbox] = {}
         self._lock = asyncio.Lock()
         self._replace_lock = asyncio.Lock()
         # OSWorld snapshot name -> E2B snapshot id (memory + filesystem state).
@@ -77,7 +81,7 @@ class GuestManager:
         sandbox = await asyncio.to_thread(create_sync)
         token = getattr(sandbox, "traffic_access_token", None)
         if not token:
-            await asyncio.to_thread(sandbox.kill)
+            await self._cleanup_or_track(sandbox, sandbox.sandbox_id)
             raise RuntimeError("E2B did not return a traffic access token")
         guest = Guest(
             sandbox=sandbox,
@@ -90,9 +94,32 @@ class GuestManager:
         try:
             await self._wait_ready(guest)
         except BaseException:
-            await asyncio.to_thread(sandbox.kill)
+            await self._cleanup_or_track(sandbox, sandbox.sandbox_id)
             raise
         return guest
+
+    async def _kill_sandbox(self, sandbox: Sandbox, sandbox_id: str) -> bool:
+        for attempt in range(1, KILL_ATTEMPTS + 1):
+            try:
+                await asyncio.to_thread(sandbox.kill)
+                return True
+            except Exception as exc:
+                print(
+                    f"[relay] warning: cleanup attempt {attempt}/{KILL_ATTEMPTS} "
+                    f"failed for {sandbox_id}: {exc}",
+                    file=sys.stderr,
+                )
+                if attempt < KILL_ATTEMPTS:
+                    await asyncio.sleep(KILL_RETRY_DELAY_S)
+        return False
+
+    async def _cleanup_or_track(self, sandbox: Sandbox, sandbox_id: str) -> None:
+        if await self._kill_sandbox(sandbox, sandbox_id):
+            async with self._lock:
+                self._pending_cleanup.pop(sandbox_id, None)
+            return
+        async with self._lock:
+            self._pending_cleanup[sandbox_id] = sandbox
 
     async def _wait_ready(self, guest: Guest) -> None:
         deadline = asyncio.get_running_loop().time() + READY_TIMEOUT_S
@@ -113,19 +140,20 @@ class GuestManager:
     async def replace(self, source: Optional[str] = None) -> Guest:
         async with self._replace_lock:
             async with self._lock:
+                if self._stopped:
+                    raise RuntimeError("guest manager is stopped")
                 generation = 1 if self._guest is None else self._guest.generation + 1
             new_guest = await self._create(generation, source)
             async with self._lock:
-                old_guest = self._guest
-                self._guest = new_guest
+                stopped = self._stopped
+                old_guest = None if stopped else self._guest
+                if not stopped:
+                    self._guest = new_guest
+            if stopped:
+                await self._cleanup_or_track(new_guest.sandbox, new_guest.sandbox_id)
+                raise RuntimeError("guest manager stopped while creating a sandbox")
             if old_guest is not None:
-                try:
-                    await asyncio.to_thread(old_guest.sandbox.kill)
-                except Exception as exc:
-                    print(
-                        f"[relay] warning: could not kill {old_guest.sandbox_id}: {exc}",
-                        file=sys.stderr,
-                    )
+                await self._cleanup_or_track(old_guest.sandbox, old_guest.sandbox_id)
         print(
             f"[relay] guest ready id={new_guest.sandbox_id} generation={generation} template={TEMPLATE}",
             file=sys.stderr,
@@ -157,12 +185,18 @@ class GuestManager:
 
     async def stop(self) -> None:
         async with self._lock:
-            guest, self._guest = self._guest, None
-        if guest is not None:
-            try:
-                await asyncio.to_thread(guest.sandbox.kill)
-            except Exception as exc:
-                print(f"[relay] warning: could not kill {guest.sandbox_id}: {exc}", file=sys.stderr)
+            self._stopped = True
+        # Wait for any create/replace already running. It observes `_stopped`,
+        # reaps its candidate, and refuses to publish it as current.
+        async with self._replace_lock:
+            async with self._lock:
+                guest, self._guest = self._guest, None
+                pending = list(self._pending_cleanup.items())
+                self._pending_cleanup.clear()
+            if guest is not None:
+                pending.append((guest.sandbox_id, guest.sandbox))
+            for sandbox_id, sandbox in pending:
+                await self._cleanup_or_track(sandbox, sandbox_id)
 
 
 manager = GuestManager()
@@ -327,7 +361,9 @@ async def save(request: web.Request) -> web.Response:
 
 async def stop(_: web.Request) -> web.Response:
     stop_event.set()
-    return web.json_response({"stopping": True, "sandbox_id": await manager.sandbox_id()})
+    sandbox_id = await manager.sandbox_id()
+    await manager.stop()
+    return web.json_response({"stopping": True, "sandbox_id": sandbox_id})
 
 
 async def main() -> None:

@@ -16,6 +16,19 @@ Tasks declaring `proxy=true` are excluded from the default environment-path mani
 port does not provision OSWorld's proxy service. `validation/proxy-required.json` retains one such
 task as an explicit diagnostic boundary.
 
+## Build identity boundary
+
+The build recipe uses a platform-specific Ubuntu image digest, a pinned OSWorld commit, locked npm
+dependencies, and a hash-locked transitive guest Python environment. Its content-derived name also
+covers Template source, copied guest files, resource allocation, and those lock files.
+
+The resulting filesystem is not claimed to be byte-reproducible. Ubuntu apt repositories and
+Google's Chrome stable repository are rolling, and the versioned VS Code download is not verified
+against a repository-owned digest. The exact Debian package versions resolved by a build are saved
+inside that E2B artifact. The generated receipt keeps the recipe digest and E2B build ID separate:
+the recipe digest identifies declared inputs, while `name:build_id` identifies the immutable
+runnable artifact.
+
 ## Lifecycle contract
 
 The host relay owns one sandbox at a time. Each OSWorld reset replaces it with a fresh sandbox from

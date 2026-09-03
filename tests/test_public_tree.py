@@ -21,6 +21,7 @@ ROOT = Path(__file__).resolve().parents[1]
         "repro/probe.ts",
         "runner/OSWorld/.git/config",
         "artifacts/template.json",
+        "cache/download.bin",
         "out/raw/trajectory.json",
         "run/agent.log",
         "template/files/server/__pycache__/main.pyc",

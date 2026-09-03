@@ -1,34 +1,38 @@
 import { Template, defaultBuildLogger } from 'e2b'
-import { template } from './template.js'
 import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import {
+  buildResourcesFromEnvironment,
+  computeRecipeIdentity,
+  createBuildReceipt,
+  loadBuildInputs,
+} from './identity.js'
 
-const TAG = process.env.GNOME_TAG || 'osworld-gnome'
+const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 
 async function main() {
-  console.log(`Building template "${TAG}"...`)
+  const resources = buildResourcesFromEnvironment(process.env)
+  const inputs = loadBuildInputs(root)
+  const identity = await computeRecipeIdentity(root, resources)
+  const { template } = await import('./template.js')
+  console.log(`Building recipe ${identity.digest} as Template "${identity.name}"...`)
   // 4 vCPU matches OSWorld's reference t3.xlarge. 8 GB (reference has 16) is
   // needed headroom: chrome_open_tabs configs load 3 heavy sites at once and
   // at 4 GB the guest thrashes, leaving CDP unresponsive for minutes.
-  const info = await Template.build(template, TAG, {
-    cpuCount: parseInt(process.env.CPU_COUNT || '4', 10),
-    memoryMB: parseInt(process.env.MEM_MB || '8192', 10),
+  const info = await Template.build(template, identity.name, {
+    cpuCount: resources.cpuCount,
+    memoryMB: resources.memoryMB,
     skipCache: process.env.SKIP_CACHE === '1',
     onBuildLogs: defaultBuildLogger(),
   })
-  const immutableRef = `${info.name}:${info.buildId}`
+  const receipt = createBuildReceipt(identity, inputs, info, new Date().toISOString())
   mkdirSync('results', { recursive: true })
-  writeFileSync('results/template-build.json', JSON.stringify({
-    builtAt: new Date().toISOString(),
-    templateName: info.name,
-    templateId: info.templateId,
-    buildId: info.buildId,
-    immutableRef,
-    osworldCommit: '7a17d3abc86d524420ea4ec96752f84d245fea74',
-    cpuCount: parseInt(process.env.CPU_COUNT || '4', 10),
-    memoryMB: parseInt(process.env.MEM_MB || '8192', 10),
-  }, null, 2) + '\n')
+  writeFileSync('results/template-build.json', `${JSON.stringify(receipt, null, 2)}\n`)
   console.log('BUILD_DONE', JSON.stringify(info))
-  console.log(`Use this exact build for validation: export GUEST_TEMPLATE=${immutableRef}`)
+  console.log(
+    `Use this exact build for validation: export GUEST_TEMPLATE=${receipt.immutableRef}`,
+  )
 }
 
 main().catch((e) => {

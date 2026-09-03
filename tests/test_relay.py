@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from threading import Event
 from unittest.mock import AsyncMock, patch
 
 from aiohttp.test_utils import make_mocked_request
@@ -35,6 +36,18 @@ class FakeSandbox:
             snapshot_id = f"snap-of-{self.sandbox_id}"
 
         return SnapshotInfo()
+
+
+class FlakyKillSandbox(FakeSandbox):
+    def __init__(self, sandbox_id):
+        super().__init__(sandbox_id)
+        self.kill_attempts = 0
+
+    def kill(self):
+        self.kill_attempts += 1
+        if self.kill_attempts < 3:
+            raise RuntimeError("transient cleanup failure")
+        self.killed = True
 
 
 class RelayTests(unittest.IsolatedAsyncioTestCase):
@@ -149,6 +162,71 @@ class RelayTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(guest.sandbox.killed)
         with self.assertRaises(relay.web.HTTPServiceUnavailable):
             await self.manager.current()
+
+    async def test_stop_racing_inflight_create_reaps_candidate(self):
+        create_started = Event()
+        allow_create = Event()
+
+        class BlockingSandbox(FakeSandbox):
+            @classmethod
+            def create(cls, template, **kwargs):
+                create_started.set()
+                if not allow_create.wait(timeout=5):
+                    raise TimeoutError("test did not release sandbox creation")
+                return super().create(template, **kwargs)
+
+        with (
+            patch.object(relay, "Sandbox", BlockingSandbox),
+            patch.object(self.manager, "_wait_ready", AsyncMock()),
+        ):
+            replacement = relay.asyncio.create_task(self.manager.replace())
+            await relay.asyncio.to_thread(create_started.wait, 5)
+            stopping = relay.asyncio.create_task(self.manager.stop())
+            await relay.asyncio.sleep(0)
+            allow_create.set()
+            await stopping
+            with self.assertRaisesRegex(RuntimeError, "stopped"):
+                await replacement
+
+        self.assertEqual(len(FakeSandbox.created), 1)
+        self.assertTrue(FakeSandbox.created[0].killed)
+        with self.assertRaises(relay.web.HTTPServiceUnavailable):
+            await self.manager.current()
+
+    async def test_replacement_retries_transient_old_guest_cleanup(self):
+        with (
+            patch.object(relay, "Sandbox", FlakyKillSandbox),
+            patch.object(self.manager, "_wait_ready", AsyncMock()),
+        ):
+            first = await self.manager.replace()
+            await self.manager.replace()
+
+        self.assertTrue(first.sandbox.killed)
+        self.assertEqual(first.sandbox.kill_attempts, 3)
+
+    async def test_stop_retries_old_guest_cleanup_that_remained_pending(self):
+        class RecoverableKillSandbox(FakeSandbox):
+            def __init__(self, sandbox_id):
+                super().__init__(sandbox_id)
+                self.allow_kill = sandbox_id != "sandbox-1"
+
+            def kill(self):
+                if not self.allow_kill:
+                    raise RuntimeError("persistent cleanup failure")
+                self.killed = True
+
+        with (
+            patch.object(relay, "Sandbox", RecoverableKillSandbox),
+            patch.object(self.manager, "_wait_ready", AsyncMock()),
+        ):
+            first = await self.manager.replace()
+            second = await self.manager.replace()
+            self.assertFalse(first.sandbox.killed)
+            first.sandbox.allow_kill = True
+            await self.manager.stop()
+
+        self.assertTrue(first.sandbox.killed)
+        self.assertTrue(second.sandbox.killed)
 
     async def test_cdp_discovery_is_rewritten_to_local_relay(self):
         payload = b'{"webSocketDebuggerUrl":"ws://upstream/devtools/browser/1","host":"upstream"}'

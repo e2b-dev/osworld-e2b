@@ -30,13 +30,16 @@ jobs:
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run ruff format --check .
+      - run: scripts/audit_python_dependencies.sh
       - run: npm ci
       - run: npm run typecheck
+      - run: npm test
       - run: npm audit --omit=dev --audit-level=high
       - name: Validate shell and JSON
         run: |
-          bash -n runner/*.sh template/files/*.sh
+          bash -n runner/*.sh scripts/*.sh template/files/*.sh
           python3 -m json.tool upstream.lock.json >/dev/null
+          python3 -m json.tool template/inputs.lock.json >/dev/null
           for file in validation/*.json; do python3 -m json.tool "$file" >/dev/null; done
       - run: uv run python scripts/check_public_tree.py
 

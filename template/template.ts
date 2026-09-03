@@ -1,13 +1,14 @@
 import * as path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { Template, waitForPort } from 'e2b'
+import { loadBuildInputs } from './identity.js'
 
 // OSWorld-oriented Ubuntu 22.04 GNOME guest for E2B.
 //
 // This is a native reconstruction, not a bit-for-bit conversion of OSWorld's
 // qcow2. It uses the same Ubuntu release, GNOME family, screen geometry, user,
-// major applications, and OSWorld control interfaces. VS Code is pinned to the
-// reference image's 1.91.1 via Microsoft's permanent versioned .deb URL.
+// major applications, and OSWorld control interfaces. VS Code is selected by
+// the reference image's 1.91.1 versioned .deb URL.
 // Chrome cannot be version-pinned the same way (Google's apt repo serves only
 // the latest stable and does not archive old .debs), so it is apt-mark held:
 // each immutable template build freezes whatever version it installed and the
@@ -15,9 +16,11 @@ import { Template, waitForPort } from 'e2b'
 // number plus an archived .deb source.
 
 const filesDir = path.join(path.dirname(fileURLToPath(import.meta.url)), 'files')
+const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const buildInputs = loadBuildInputs(root)
 
 export const template = Template({ fileContextPath: filesDir })
-  .fromImage('ubuntu:22.04')
+  .fromImage(buildInputs.baseImage.reference)
   .setUser('root')
   .setWorkdir('/')
   .setEnvs({
@@ -109,8 +112,8 @@ export const template = Template({ fileContextPath: filesDir })
     'apt-mark hold google-chrome-stable',
   ])
   // ---- VSCode pinned to the OSWorld reference image's 1.91.1 --------------
-  // Installed from Microsoft's permanent versioned .deb URL, not the rolling
-  // apt repo: 1.91.1 predates the Copilot chat panel and sign-in surfaces
+  // Installed from Microsoft's versioned .deb URL, not the rolling apt repo:
+  // 1.91.1 predates the Copilot chat panel and sign-in surfaces
   // that measurably distracted agents in live runs on newer builds.
   .runCmd([
     'curl -fsSL -o /tmp/code_1.91.1.deb "https://update.code.visualstudio.com/1.91.1/linux-deb-x64/stable"',
@@ -177,7 +180,14 @@ export const template = Template({ fileContextPath: filesDir })
   .copy('server', '/opt/osworld-server')
   .copy('session_inner.sh', '/opt/osworld-server/session_inner.sh', { mode: 0o755 })
   .copy('start.sh', '/opt/osworld-server/start.sh', { mode: 0o755 })
-  .runCmd('python3 -m pip install --no-cache-dir -r /opt/osworld-server/requirements.txt')
+  .runCmd(
+    'python3 -m pip install --no-cache-dir --require-hashes -r /opt/osworld-server/requirements.lock',
+  )
+  // Capture the package versions that rolling apt sources resolved inside
+  // this artifact. The inventory does not make the recipe byte-reproducible.
+  .runCmd(
+    "dpkg-query -W -f='${binary:Package}=${Version}\\n' | LC_ALL=C sort > /opt/osworld-server/resolved-debian-packages.txt",
+  )
   .runCmd([
     'ln -sf /usr/bin/python3 /usr/bin/python || true',
     'chown -R user:user /opt/osworld-server /home/user',

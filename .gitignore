@@ -16,6 +16,7 @@ dist/
 results/
 repro/
 artifacts/
+cache/
 out/
 runner/OSWorld/
 *.log

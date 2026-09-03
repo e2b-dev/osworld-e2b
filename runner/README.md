@@ -22,7 +22,7 @@ reference printed by the build command:
 ```bash
 export E2B_API_KEY='...'
 npm run build
-export GUEST_TEMPLATE='osworld-gnome:<build-id>'
+export GUEST_TEMPLATE='osworld-gnome-<recipe-digest-prefix>:<build-id>'
 ```
 
 The manager, relay, validation script, and normal run script reject a missing
