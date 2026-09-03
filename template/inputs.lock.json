@@ -7,7 +7,7 @@
   },
   "osworld": {
     "repository": "https://github.com/xlang-ai/OSWorld.git",
-    "commit": "7a17d3abc86d524420ea4ec96752f84d245fea74"
+    "commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d"
   },
   "byteReproducible": false,
   "resolvedDuringBuild": [

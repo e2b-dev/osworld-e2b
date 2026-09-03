@@ -434,7 +434,8 @@ Commit: `feat: pin Qwen Docker parity contract`
 
 - [ ] **Step 1: Replace the 24-task default and proxy exclusion claims with generated profile suites**
 
-Document `current-v1` as default, the 369/361/8 census, the 52 proxy-required tasks, runtime proxy
+Document `current-v1` as default, the 369/361/8 census, the 56 all-suite and 49 no-GDrive
+proxy-required tasks, runtime proxy
 and secret requirements, and the historical parity profile's inferred source limitation. Retain the
 24-task manifest only as a named smoke lane rather than the claimed support boundary.
 
