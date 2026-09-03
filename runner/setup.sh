@@ -3,15 +3,43 @@
 # wire in the E2B provider (realkit/provider.py + manager.py) so OSWorld's own
 # run.py works with --provider_name e2b. Idempotent: re-running is safe.
 #
-# Usage:  ./setup.sh [dest-dir]     (default: runner/OSWorld)
+# Usage:  ./setup.sh [--profile NAME] [dest-dir]     (default: current-v1, runner/OSWorld)
 # After:  see README.md in this directory for the run steps.
 set -euo pipefail
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd "$HERE/.." && pwd)"
 REALKIT="$HERE/../realkit"
-PIN=7a17d3abc86d524420ea4ec96752f84d245fea74
-DEST="${1:-$HERE/OSWorld}"
-UPSTREAM=https://github.com/xlang-ai/OSWorld.git
+PROFILES="$ROOT/validation/profiles.json"
+PROFILE=current-v1
+DEST=""
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --profile)
+            [ "$#" -ge 2 ] || { echo "--profile requires a value" >&2; exit 2; }
+            PROFILE="$2"
+            shift 2
+            ;;
+        --help|-h)
+            echo "Usage: $0 [--profile NAME] [dest-dir]"
+            exit 0
+            ;;
+        -*)
+            echo "unknown option: $1" >&2
+            exit 2
+            ;;
+        *)
+            [ -z "$DEST" ] || { echo "only one destination may be supplied" >&2; exit 2; }
+            DEST="$1"
+            shift
+            ;;
+    esac
+done
+
+DEST="${DEST:-$HERE/OSWorld}"
+PIN="$(python3 "$HERE/profile.py" --profiles "$PROFILES" get --name "$PROFILE" --field commit)"
+UPSTREAM="$(python3 "$HERE/profile.py" --profiles "$PROFILES" get --name "$PROFILE" --field repository)"
 
 if [ -e "$DEST" ] && [ ! -d "$DEST/.git" ]; then
     echo "destination exists but is not a Git checkout: $DEST" >&2
@@ -27,8 +55,10 @@ case "$origin" in
 esac
 git -C "$DEST" fetch --quiet --depth=1 origin "$PIN"
 git -C "$DEST" checkout --detach --quiet "$PIN"
+python3 "$HERE/profile.py" --profiles "$PROFILES" verify \
+    --name "$PROFILE" --checkout "$DEST" --repo-root "$ROOT"
 python3 "$HERE/patch_upstream.py" "$DEST" --expected-commit "$PIN"
-echo "OSWorld at $DEST (pin $PIN)"
+echo "OSWorld at $DEST (profile $PROFILE, pin $PIN)"
 
 # ---- provider package ----------------------------------------------------
 mkdir -p "$DEST/desktop_env/providers/e2b"

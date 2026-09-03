@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
 import json
 import re
+import subprocess
+import sys
 from pathlib import Path
 
 COMMIT_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -119,3 +122,53 @@ def write_inventory(path: Path, inventory: dict, *, check: bool = False) -> None
         return
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(rendered)
+
+
+def verify_profile_checkout(checkout: Path, profile: dict, repo_root: Path) -> None:
+    actual_commit = subprocess.check_output(
+        ["git", "-C", str(checkout), "rev-parse", "HEAD"], text=True
+    ).strip()
+    if actual_commit != profile["commit"]:
+        raise ValueError(
+            f"OSWorld commit mismatch for {profile['name']}: "
+            f"expected {profile['commit']}, got {actual_commit}"
+        )
+    for suite, suite_config in profile["suites"].items():
+        expected = load_inventory(repo_root / suite_config["inventory"])
+        actual = build_inventory(checkout, profile, suite)
+        if expected != actual:
+            raise ValueError(
+                f"inventory drift for profile {profile['name']} suite {suite}: "
+                f"expected {expected['inventory_sha256']}, got {actual['inventory_sha256']}"
+            )
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--profiles", type=Path, required=True)
+    subparsers = parser.add_subparsers(dest="command", required=True)
+    get_parser = subparsers.add_parser("get")
+    get_parser.add_argument("--name", required=True)
+    get_parser.add_argument("--field", required=True)
+    verify_parser = subparsers.add_parser("verify")
+    verify_parser.add_argument("--name", required=True)
+    verify_parser.add_argument("--checkout", type=Path, required=True)
+    verify_parser.add_argument("--repo-root", type=Path, required=True)
+    args = parser.parse_args()
+    try:
+        profile = select_profile(args.name, args.profiles)
+        if args.command == "get":
+            value = profile.get(args.field)
+            if not isinstance(value, str):
+                raise ValueError(f"profile field is not a string: {args.field}")
+            print(value)
+        else:
+            verify_profile_checkout(args.checkout, profile, args.repo_root)
+    except (OSError, ValueError, subprocess.CalledProcessError) as error:
+        print(f"ERROR: {error}", file=sys.stderr)
+        return 2
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -1,11 +1,19 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
 
-from runner.profile import build_inventory, load_inventory, load_profiles, select_profile
+from runner.profile import (
+    build_inventory,
+    load_inventory,
+    load_profiles,
+    select_profile,
+    verify_profile_checkout,
+    write_inventory,
+)
 
 ROOT = Path(__file__).resolve().parents[1]
 PROFILES = ROOT / "validation" / "profiles.json"
@@ -131,3 +139,37 @@ def test_gdrive_inventory_is_the_ordered_all_minus_nogdrive_difference(tmp_path:
 def test_unknown_profile_is_rejected() -> None:
     with pytest.raises(ValueError, match="unknown OSWorld profile"):
         select_profile("osworld-main", PROFILES)
+
+
+def test_checkout_verification_allows_adapter_diff_but_detects_task_drift(
+    tmp_path: Path,
+) -> None:
+    checkout = _checkout(tmp_path)
+    subprocess.run(["git", "init", "-q", "-b", "main"], cwd=checkout, check=True)
+    subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=checkout, check=True)
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=checkout, check=True)
+    subprocess.run(["git", "add", "."], cwd=checkout, check=True)
+    subprocess.run(["git", "commit", "-qm", "fixture"], cwd=checkout, check=True)
+    commit = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=checkout, text=True).strip()
+    profile = {
+        "name": "fixture",
+        "repository": "https://github.com/xlang-ai/OSWorld.git",
+        "commit": commit,
+        "suites": {
+            "nogdrive": {
+                "upstream_manifest": "evaluation_examples/test_nogdrive.json",
+                "inventory": "validation/inventories/fixture.json",
+            }
+        },
+    }
+    repo_root = tmp_path / "port"
+    inventory_path = repo_root / profile["suites"]["nogdrive"]["inventory"]
+    write_inventory(inventory_path, build_inventory(checkout, profile, "nogdrive"))
+
+    adapter = checkout / "desktop_env" / "desktop_env.py"
+    adapter.write_text("# generated E2B boundary patch\n")
+    verify_profile_checkout(checkout, profile, repo_root)
+
+    _task(checkout, "chrome", "task-a", proxy=False)
+    with pytest.raises(ValueError, match="inventory drift"):
+        verify_profile_checkout(checkout, profile, repo_root)
