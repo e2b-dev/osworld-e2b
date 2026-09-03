@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import json
+import shutil
+import tempfile
 import unittest
+from pathlib import Path
 from threading import Event
 from unittest.mock import AsyncMock, patch
 
@@ -53,6 +57,9 @@ class FlakyKillSandbox(FakeSandbox):
 class RelayTests(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
         FakeSandbox.created.clear()
+        self._event_dir = Path(tempfile.mkdtemp())
+        self._event_log = self._event_dir / "relay-events.jsonl"
+        self.addCleanup(shutil.rmtree, self._event_dir)
         self.manager = relay.GuestManager()
         self.template_patch = patch.object(
             relay,
@@ -233,6 +240,21 @@ class RelayTests(unittest.IsolatedAsyncioTestCase):
         rewritten = relay._rewrite_cdp_host(payload, 19222).decode()
         self.assertIn("ws://127.0.0.1:19222/devtools/browser/1", rewritten)
         self.assertIn('"host": "127.0.0.1:19222"', rewritten)
+
+    async def test_lifecycle_event_log_records_cleanup_without_tokens(self):
+        with (
+            self.subTest("events"),
+            patch.object(relay, "Sandbox", FakeSandbox),
+            patch.object(self.manager, "_wait_ready", AsyncMock()),
+            patch.object(relay, "EVENT_LOG", self._event_log),
+        ):
+            guest = await self.manager.replace()
+            await self.manager.stop()
+
+        events = [json.loads(line) for line in self._event_log.read_text().splitlines()]
+        self.assertEqual(events[-1]["event"], "SANDBOX_CLEANED")
+        self.assertEqual(events[-1]["sandbox_id"], guest.sandbox_id)
+        self.assertNotIn("token", self._event_log.read_text().lower())
 
 
 if __name__ == "__main__":

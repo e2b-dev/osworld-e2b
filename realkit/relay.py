@@ -15,6 +15,8 @@ import re
 import signal
 import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 import aiohttp
@@ -31,10 +33,31 @@ SANDBOX_TIMEOUT_S = int(os.environ.get("SANDBOX_TIMEOUT_S", "3600"))
 RELAY_HTTP_TIMEOUT_S = int(os.environ.get("RELAY_HTTP_TIMEOUT_S", "240"))
 READY_TIMEOUT_S = int(os.environ.get("GUEST_READY_TIMEOUT_S", "180"))
 CONTROL_PORT = int(os.environ.get("E2B_RELAY_CONTROL_PORT", "14999"))
+SERVER_PORT = int(os.environ.get("E2B_RELAY_SERVER_PORT", "15000"))
+CHROMIUM_PORT = int(os.environ.get("E2B_RELAY_CHROMIUM_PORT", "19222"))
+VLC_PORT = int(os.environ.get("E2B_RELAY_VLC_PORT", "18080"))
 KILL_ATTEMPTS = int(os.environ.get("E2B_KILL_ATTEMPTS", "3"))
 KILL_RETRY_DELAY_S = float(os.environ.get("E2B_KILL_RETRY_DELAY_S", "0.1"))
-PORT_MAP = {15000: 5000, 19222: 9222, 18080: 8080}
-CDP_LOCAL = 19222
+PORT_MAP = {SERVER_PORT: 5000, CHROMIUM_PORT: 9222, VLC_PORT: 8080}
+CDP_LOCAL = CHROMIUM_PORT
+EVENT_LOG = (
+    Path(os.environ["E2B_RELAY_EVENT_LOG"]) if os.environ.get("E2B_RELAY_EVENT_LOG") else None
+)
+
+
+def _record_event(event: str, **fields: object) -> None:
+    if EVENT_LOG is None:
+        return
+    record = {
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "event": event,
+        **fields,
+    }
+    EVENT_LOG.parent.mkdir(parents=True, exist_ok=True)
+    with EVENT_LOG.open("a", encoding="utf-8") as stream:
+        stream.write(json.dumps(record, sort_keys=True) + "\n")
+        stream.flush()
+        os.fsync(stream.fileno())
 
 
 @dataclass(frozen=True)
@@ -69,6 +92,12 @@ class GuestManager:
 
     async def _create(self, generation: int, source: Optional[str] = None) -> Guest:
         template = require_immutable_template_ref(TEMPLATE, "GUEST_TEMPLATE")
+        _record_event(
+            "SANDBOX_CREATE_STARTED",
+            generation=generation,
+            source=f"snapshot:{source}" if source else "template",
+            template=template,
+        )
 
         def create_sync() -> Sandbox:
             return Sandbox.create(
@@ -91,17 +120,32 @@ class GuestManager:
             generation=generation,
             source=f"snapshot:{source}" if source else "template",
         )
+        _record_event(
+            "SANDBOX_CREATED",
+            sandbox_id=guest.sandbox_id,
+            generation=generation,
+            source=guest.source,
+            template=template,
+        )
         try:
             await self._wait_ready(guest)
         except BaseException:
             await self._cleanup_or_track(sandbox, sandbox.sandbox_id)
             raise
+        _record_event(
+            "SANDBOX_READY",
+            sandbox_id=guest.sandbox_id,
+            generation=generation,
+            source=guest.source,
+            template=template,
+        )
         return guest
 
     async def _kill_sandbox(self, sandbox: Sandbox, sandbox_id: str) -> bool:
         for attempt in range(1, KILL_ATTEMPTS + 1):
             try:
                 await asyncio.to_thread(sandbox.kill)
+                _record_event("SANDBOX_CLEANED", sandbox_id=sandbox_id, cleanup="success")
                 return True
             except Exception as exc:
                 print(
@@ -111,6 +155,7 @@ class GuestManager:
                 )
                 if attempt < KILL_ATTEMPTS:
                     await asyncio.sleep(KILL_RETRY_DELAY_S)
+        _record_event("SANDBOX_CLEANUP_FAILED", sandbox_id=sandbox_id, cleanup="failed")
         return False
 
     async def _cleanup_or_track(self, sandbox: Sandbox, sandbox_id: str) -> None:
@@ -170,6 +215,12 @@ class GuestManager:
         guest = await self.current()
         info = await asyncio.to_thread(guest.sandbox.create_snapshot)
         self._snapshots[name] = info.snapshot_id
+        _record_event(
+            "SNAPSHOT_SAVED",
+            sandbox_id=guest.sandbox_id,
+            snapshot_name=name,
+            snapshot_id=info.snapshot_id,
+        )
         print(
             f"[relay] snapshot saved name={name} id={info.snapshot_id} sandbox={guest.sandbox_id}",
             file=sys.stderr,

@@ -62,7 +62,7 @@ echo "OSWorld at $DEST (profile $PROFILE, pin $PIN)"
 
 # ---- provider package ----------------------------------------------------
 mkdir -p "$DEST/desktop_env/providers/e2b"
-cp "$REALKIT/provider.py" "$REALKIT/manager.py" "$REALKIT/e2b_policy.py" \
+cp "$REALKIT/provider.py" "$REALKIT/manager.py" "$REALKIT/e2b_policy.py" "$REALKIT/ports.py" \
     "$DEST/desktop_env/providers/e2b/"
 touch "$DEST/desktop_env/providers/e2b/__init__.py"
 
