@@ -316,6 +316,11 @@ class RunLedger:
     def _write_aggregate(self, aggregate: dict) -> None:
         _atomic_json(self.root / "aggregate.json", aggregate)
 
+    def refresh_aggregate(self, **extra: object) -> dict:
+        aggregate = {**self.aggregate(), **extra}
+        self._write_aggregate(aggregate)
+        return aggregate
+
 
 def catalog_artifacts(root: Path) -> list[dict]:
     root = Path(root)
