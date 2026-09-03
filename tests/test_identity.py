@@ -46,18 +46,19 @@ async def test_relay_rejects_mutable_identity_before_creating_a_sandbox() -> Non
     sandbox.create.assert_not_called()
 
 
-def test_normal_runner_rejects_mutable_identity_before_starting_relay(tmp_path: Path) -> None:
+def test_normal_runner_delegates_identity_validation_to_the_contract(tmp_path: Path) -> None:
     fake_bin = tmp_path / "bin"
     fake_bin.mkdir()
     python = fake_bin / "python3"
-    python.write_text("#!/bin/sh\necho relay-should-not-start >&2\nexit 99\n")
+    python.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$ARGS_LOG"\nexit 77\n')
     python.chmod(0o755)
+    args_log = tmp_path / "args.log"
 
     result = subprocess.run(
-        ["bash", str(ROOT / "runner" / "run.sh")],
+        ["bash", str(ROOT / "runner" / "run.sh"), "--contract", "contract.json"],
         env={
             **os.environ,
-            "GUEST_TEMPLATE": "osworld-gnome",
+            "ARGS_LOG": str(args_log),
             "PATH": f"{fake_bin}:{os.environ['PATH']}",
         },
         capture_output=True,
@@ -65,9 +66,8 @@ def test_normal_runner_rejects_mutable_identity_before_starting_relay(tmp_path: 
         timeout=10,
     )
 
-    assert result.returncode == 2
-    assert "immutable name:build_id" in result.stderr
-    assert "relay-should-not-start" not in result.stderr
+    assert result.returncode == 77
+    assert args_log.read_text().splitlines()[-2:] == ["--contract", "contract.json"]
 
 
 @pytest.mark.asyncio

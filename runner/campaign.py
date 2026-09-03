@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import hashlib
 import json
 import math
 import os
@@ -14,10 +15,11 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from realkit.contract import compare_results, load_contract, validate_contract
 from realkit.e2b_policy import require_immutable_template_ref
 from realkit.preflight import collect_redaction_values, redact_text, validate_capabilities
 from realkit.results import AttemptEvent, RunLedger, TaskKey, catalog_artifacts
-from runner.profile import load_inventory, select_profile
+from runner.profile import load_inventory, load_profiles
 
 DEFAULT_NUM_ENVS = 8
 PROTECTED_ARGUMENTS = {
@@ -112,6 +114,7 @@ async def execute_campaign(
     child_environment: dict[str, str] | None = None,
     proxy_config: Path | None = None,
     secret_mounts: tuple[str, ...] | list[str] = (),
+    model_endpoints: tuple[str, ...] | list[str] = (),
 ) -> RunLedger:
     template = require_immutable_template_ref(template, "template")
     if num_envs < 1:
@@ -147,7 +150,7 @@ async def execute_campaign(
     active_children = 0
     max_observed_children = 0
 
-    async def run_attempt(task: TaskKey, attempt: int) -> None:
+    async def run_attempt(task: TaskKey, attempt: int, candidate_index: int) -> None:
         nonlocal active_children, max_observed_children
         async with semaphore:
             attempt_dir = run_root / "attempts" / task.domain / task.id / str(attempt)
@@ -187,6 +190,10 @@ async def execute_campaign(
             }
             if proxy_config is not None:
                 environment["PROXY_CONFIG_FILE"] = str(Path(proxy_config).resolve())
+            if model_endpoints:
+                environment["OPENAI_BASE_URL"] = model_endpoints[
+                    candidate_index % len(model_endpoints)
+                ]
             stdout_path = attempt_dir / "stdout.log"
             stderr_path = attempt_dir / "stderr.log"
             timed_out = False
@@ -265,7 +272,8 @@ async def execute_campaign(
 
     candidates = ledger.resume_candidates(max_attempts)
     campaign_tasks = [
-        asyncio.create_task(run_attempt(task, attempt)) for task, attempt in candidates
+        asyncio.create_task(run_attempt(task, attempt, index))
+        for index, (task, attempt) in enumerate(candidates)
     ]
     try:
         await asyncio.gather(*campaign_tasks)
@@ -293,35 +301,96 @@ def _run_id() -> str:
 def main() -> int:
     root = Path(__file__).resolve().parents[1]
     parser = argparse.ArgumentParser()
-    parser.add_argument("--profile", default="current-v1")
-    parser.add_argument("--suite", default="nogdrive")
-    parser.add_argument("--template", required=True)
+    parser.add_argument("--contract", type=Path, required=True)
+    parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--osworld-root", type=Path, default=root / "runner" / "OSWorld")
     parser.add_argument("--result-root", type=Path, default=root / "results" / "runs")
     parser.add_argument("--run-id", default=None)
-    parser.add_argument("--runner", type=Path, default=None)
-    parser.add_argument("--num-envs", type=int, default=DEFAULT_NUM_ENVS)
-    parser.add_argument("--task-timeout-seconds", type=float, default=1800)
-    parser.add_argument("--max-attempts", type=int, default=1)
+    parser.add_argument("--num-envs", type=int, default=None)
     parser.add_argument("--proxy-config", type=Path, default=None)
     parser.add_argument("--vm-secret-mount", action="append", default=[])
-    args, upstream_args = parser.parse_known_args()
-    if upstream_args and upstream_args[0] == "--":
-        upstream_args = upstream_args[1:]
+    args = parser.parse_args()
     try:
         profiles_path = root / "validation" / "profiles.json"
-        profile = select_profile(args.profile, profiles_path)
-        if args.suite not in profile["suites"]:
-            raise ValueError(f"profile {args.profile} does not declare suite {args.suite}")
-        inventory = load_inventory(root / profile["suites"][args.suite]["inventory"])
-        runner = args.runner or args.osworld_root / profile["runner"]
+        profiles = load_profiles(profiles_path)
+        contract = load_contract(args.contract)
+        benchmark = contract["benchmark"]
+        profile = profiles["profiles"][benchmark["profile"]]
+        inventory = load_inventory(root / profile["suites"][benchmark["suite"]]["inventory"])
+        validate_contract(
+            contract,
+            profiles,
+            inventory,
+            for_execution=not args.preflight_only,
+        )
+        capabilities = validate_capabilities(
+            inventory["tasks"],
+            benchmark["suite"],
+            args.proxy_config,
+            args.vm_secret_mount,
+        )
+        if args.preflight_only:
+            print(
+                "PREFLIGHT_OK",
+                json.dumps(
+                    {
+                        "profile": benchmark["profile"],
+                        "suite": benchmark["suite"],
+                        "task_count": inventory["task_count"],
+                        "capabilities": capabilities.to_dict(),
+                    },
+                    sort_keys=True,
+                ),
+            )
+            return 0
+        execution = contract["execution"]
+        sandbox_cap = execution["sandbox_concurrency_cap"]
+        num_envs = args.num_envs if args.num_envs is not None else sandbox_cap
+        if num_envs > sandbox_cap:
+            raise ValueError(f"num_envs {num_envs} exceeds sandbox_concurrency_cap {sandbox_cap}")
+        settings = contract["agent"]["settings"]
+        upstream_args = [
+            "--observation_type",
+            settings["observation_type"],
+            "--action_space",
+            settings["action_space"],
+            "--model",
+            contract["agent"]["model"],
+            "--sleep_after_execution",
+            str(settings["sleep_after_execution"]),
+            "--max_steps",
+            str(settings["max_steps"]),
+            "--max_trajectory_length",
+            str(settings["max_trajectory_length"]),
+            "--temperature",
+            str(settings["temperature"]),
+            "--top_p",
+            str(settings["top_p"]),
+            "--max_tokens",
+            str(settings["max_tokens"]),
+            "--coord",
+            settings["coordinate_type"],
+            "--api_backend",
+            "openai",
+            "--screen_width",
+            str(settings["screen_width"]),
+            "--screen_height",
+            str(settings["screen_height"]),
+            "--client_password",
+            "password",
+        ]
+        endpoint_labels = contract["agent"]["endpoint_env"]
+        model_endpoints = [os.environ[label] for label in endpoint_labels]
+        runner = args.osworld_root / profile["runner"]
         metadata = {
-            "profile": args.profile,
-            "suite": args.suite,
+            "profile": benchmark["profile"],
+            "suite": benchmark["suite"],
             "osworld_commit": profile["commit"],
             "inventory_sha256": inventory["inventory_sha256"],
-            "template": args.template,
+            "template": contract["route"]["template_ref"],
             "runner": profile["runner"],
+            "contract_sha256": hashlib.sha256(args.contract.read_bytes()).hexdigest(),
+            "endpoint_env": endpoint_labels,
             "upstream_args": upstream_args,
         }
         run_root = args.result_root / (args.run_id or _run_id())
@@ -332,20 +401,36 @@ def main() -> int:
                 metadata=metadata,
                 runner=runner,
                 osworld_root=args.osworld_root,
-                template=args.template,
-                num_envs=args.num_envs,
-                task_timeout_seconds=args.task_timeout_seconds,
-                max_attempts=args.max_attempts,
+                template=contract["route"]["template_ref"],
+                num_envs=num_envs,
+                task_timeout_seconds=execution["task_timeout_seconds"],
+                max_attempts=execution["max_attempts_per_task"],
                 upstream_args=upstream_args,
                 proxy_config=args.proxy_config,
                 secret_mounts=args.vm_secret_mount,
+                model_endpoints=model_endpoints,
             )
         )
+        aggregate = json.loads((ledger.root / "aggregate.json").read_text())
+        if benchmark["profile"] == "ui-mopd-qwen3vl-docker":
+            reference = json.loads(
+                (root / "validation" / "reference" / "ui-mopd-qwen3vl-docker.json").read_text()
+            )
+            comparison = compare_results(
+                {(task.domain, task.id): reward for task, reward in ledger.valid_results().items()},
+                reference,
+                absolute_score_delta_lte=contract["comparison"]["absolute_score_delta_lte"],
+            )
+            aggregate = ledger.refresh_aggregate(
+                configured_num_envs=aggregate["configured_num_envs"],
+                max_observed_children=aggregate["max_observed_children"],
+                comparison=comparison,
+            )
     except (OSError, ValueError, KeyboardInterrupt) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
-    print(json.dumps({"run_root": str(ledger.root), "aggregate": ledger.aggregate()}))
-    return 0 if ledger.aggregate()["remaining_tasks"] == 0 else 1
+    print(json.dumps({"run_root": str(ledger.root), "aggregate": aggregate}))
+    return 0 if aggregate["remaining_tasks"] == 0 else 1
 
 
 if __name__ == "__main__":

@@ -252,6 +252,14 @@ class RunLedger:
             if item["event"] == "TERMINAL" and item.get("outcome") == "valid"
         }
 
+    def valid_results(self) -> dict[TaskKey, float]:
+        """Return the latest valid evaluator reward for each completed task."""
+        results = {}
+        for item in self._events():
+            if item["event"] == "TERMINAL" and item.get("outcome") == "valid":
+                results[TaskKey(item["domain"], item["task_id"])] = float(item["reward"])
+        return results
+
     def resume_candidates(self, max_attempts: int) -> list[tuple[TaskKey, int]]:
         if max_attempts < 1:
             raise ValueError("max_attempts must be positive")

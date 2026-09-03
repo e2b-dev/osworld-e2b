@@ -41,6 +41,7 @@ def test_valid_zero_is_scored_while_missing_is_invalid(tmp_path: Path) -> None:
     assert aggregate["invalid_by_reason"] == {"missing_result": 1}
     assert aggregate["score"] == 0.0
     assert aggregate["reward_sum"] == 0.0
+    assert ledger.valid_results() == {TASK_A: 0.0}
 
 
 def test_unmatched_started_event_is_visible_as_missing_and_resumable(tmp_path: Path) -> None:
