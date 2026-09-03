@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 def main() -> int:
+    print("ARGS", " ".join(sys.argv))
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider_name")
     parser.add_argument("--path_to_vm")

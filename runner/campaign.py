@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from realkit.e2b_policy import require_immutable_template_ref
+from realkit.preflight import collect_redaction_values, redact_text, validate_capabilities
 from realkit.results import AttemptEvent, RunLedger, TaskKey, catalog_artifacts
 from runner.profile import load_inventory, select_profile
 
@@ -26,6 +27,7 @@ PROTECTED_ARGUMENTS = {
     "--test_all_meta_path",
     "--result_dir",
     "--num_envs",
+    "--vm_secret_mount",
 }
 
 
@@ -84,6 +86,17 @@ def _parse_reward(result_root: Path) -> tuple[float | None, str | None]:
     return reward, None
 
 
+def _redact_logs(root: Path, sensitive_values: tuple[str, ...]) -> None:
+    for path in root.rglob("*.log"):
+        try:
+            text = path.read_text()
+        except (OSError, UnicodeDecodeError):
+            continue
+        redacted = redact_text(text, sensitive_values)
+        if redacted != text:
+            path.write_text(redacted)
+
+
 async def execute_campaign(
     *,
     run_root: Path,
@@ -97,6 +110,8 @@ async def execute_campaign(
     max_attempts: int,
     upstream_args: tuple[str, ...] | list[str] = (),
     child_environment: dict[str, str] | None = None,
+    proxy_config: Path | None = None,
+    secret_mounts: tuple[str, ...] | list[str] = (),
 ) -> RunLedger:
     template = require_immutable_template_ref(template, "template")
     if num_envs < 1:
@@ -105,10 +120,18 @@ async def execute_campaign(
         raise ValueError("task_timeout_seconds must be positive")
     if max_attempts < 1:
         raise ValueError("max_attempts must be positive")
-    protected = PROTECTED_ARGUMENTS.intersection(upstream_args)
+    protected = {
+        argument.split("=", 1)[0]
+        for argument in upstream_args
+        if argument.split("=", 1)[0] in PROTECTED_ARGUMENTS
+    }
     if protected:
         raise ValueError(f"upstream arguments override campaign identity: {sorted(protected)}")
     tasks = [TaskKey(item["domain"], item["id"]) for item in inventory["tasks"]]
+    suite = metadata.get("suite", inventory.get("suite", ""))
+    capabilities = validate_capabilities(inventory["tasks"], suite, proxy_config, secret_mounts)
+    metadata = {**metadata, "capabilities": capabilities.to_dict()}
+    sensitive_values = collect_redaction_values(proxy_config, secret_mounts)
     run_root = Path(run_root)
     if (run_root / "run.json").exists():
         ledger = RunLedger.open(run_root)
@@ -151,6 +174,7 @@ async def execute_campaign(
                 str(result_root),
                 "--num_envs",
                 "1",
+                *[value for mount in secret_mounts for value in ("--vm_secret_mount", mount)],
                 *upstream_args,
             ]
             environment = {
@@ -161,6 +185,8 @@ async def execute_campaign(
                 "E2B_RELAY_PATH": str(osworld_root / "e2b_relay.py"),
                 "OSWORLD_LOG_DIR": str(log_root),
             }
+            if proxy_config is not None:
+                environment["PROXY_CONFIG_FILE"] = str(Path(proxy_config).resolve())
             stdout_path = attempt_dir / "stdout.log"
             stderr_path = attempt_dir / "stderr.log"
             timed_out = False
@@ -190,6 +216,7 @@ async def execute_campaign(
                     async with counter_lock:
                         active_children -= 1
 
+            _redact_logs(attempt_dir, sensitive_values)
             cleanup = _cleanup_status(attempt_dir / "relay-events.jsonl")
             reward, result_error = _parse_reward(result_root)
             artifacts = catalog_artifacts(attempt_dir)
@@ -276,6 +303,8 @@ def main() -> int:
     parser.add_argument("--num-envs", type=int, default=DEFAULT_NUM_ENVS)
     parser.add_argument("--task-timeout-seconds", type=float, default=1800)
     parser.add_argument("--max-attempts", type=int, default=1)
+    parser.add_argument("--proxy-config", type=Path, default=None)
+    parser.add_argument("--vm-secret-mount", action="append", default=[])
     args, upstream_args = parser.parse_known_args()
     if upstream_args and upstream_args[0] == "--":
         upstream_args = upstream_args[1:]
@@ -308,6 +337,8 @@ def main() -> int:
                 task_timeout_seconds=args.task_timeout_seconds,
                 max_attempts=args.max_attempts,
                 upstream_args=upstream_args,
+                proxy_config=args.proxy_config,
+                secret_mounts=args.vm_secret_mount,
             )
         )
     except (OSError, ValueError, KeyboardInterrupt) as error:

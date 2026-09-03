@@ -181,3 +181,33 @@ async def test_every_attempt_has_raw_logs_and_artifact_checksums(tmp_path: Path)
     assert {"stdout.log", "stderr.log", "task-manifest.json"}.issubset(paths)
     assert any(path.endswith("result.txt") for path in paths)
     assert any(path.endswith("relay-events.jsonl") for path in paths)
+
+
+@pytest.mark.asyncio
+async def test_campaign_injects_but_does_not_retain_secret_source_path_or_bytes(
+    tmp_path: Path,
+) -> None:
+    secret = tmp_path / "google-service-account.json"
+    secret.write_text('{"private_key":"secret-private-key"}')
+    inventory = _inventory(["task-a"])
+
+    ledger = await execute_campaign(
+        run_root=tmp_path / "run",
+        inventory=inventory,
+        metadata={"profile": "fixture", "suite": "gdrive", "template": TEMPLATE},
+        runner=FAKE_RUNNER,
+        osworld_root=tmp_path,
+        template=TEMPLATE,
+        num_envs=1,
+        task_timeout_seconds=2,
+        max_attempts=1,
+        secret_mounts=[f"{secret}:/opt/osworld/secrets/google.json"],
+    )
+    retained = (ledger.root / "run.json").read_text() + (
+        ledger.root / "attempts" / "chrome" / "task-a" / "1" / "stdout.log"
+    ).read_text()
+
+    assert str(secret) not in retained
+    assert "secret-private-key" not in retained
+    assert "google-service-account.json" in retained
+    assert "/opt/osworld/secrets/google.json" in retained
