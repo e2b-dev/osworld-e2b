@@ -14,6 +14,7 @@ from runner.profile import load_inventory, load_profiles
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE = ROOT / "validation" / "reference" / "ui-mopd-qwen3vl-docker.json"
 EXAMPLE = ROOT / "validation" / "validation-contract.example.json"
+FULL_EXAMPLE = ROOT / "validation" / "full-suite-contract.example.json"
 PROFILES = ROOT / "validation" / "profiles.json"
 INVENTORY = ROOT / "validation" / "inventories" / "ui-mopd-qwen3vl-docker-nogdrive.json"
 
@@ -44,6 +45,16 @@ def test_example_contract_is_complete_for_no_cost_preflight_but_not_execution() 
     validate_contract(contract, profiles, inventory, for_execution=False)
     with pytest.raises(ValueError, match="execution_authorized"):
         validate_contract(contract, profiles, inventory, for_execution=True)
+
+
+def test_current_full_suite_contract_covers_all_369_tasks_without_historical_comparison() -> None:
+    contract = load_contract(FULL_EXAMPLE)
+    profiles = load_profiles(PROFILES)
+    inventory = load_inventory(ROOT / "validation/inventories/current-v1-all.json")
+
+    validate_contract(contract, profiles, inventory, for_execution=False)
+    assert contract["benchmark"]["task_count"] == 369
+    assert contract["comparison"] == {"mode": "none"}
 
 
 def test_contract_rejects_mutable_template_and_shared_or_insufficient_caps() -> None:
@@ -175,6 +186,38 @@ def test_campaign_cli_accepts_example_only_for_no_cost_preflight(tmp_path: Path)
 
     assert result.returncode == 0, result.stderr
     assert "PREFLIGHT_OK" in result.stdout
+    assert not result_root.exists()
+
+
+def test_campaign_cli_preflights_current_full_suite_capabilities(tmp_path: Path) -> None:
+    result_root = tmp_path / "runs"
+    secret = tmp_path / "google.json"
+    secret.write_text('{"credential":"test-only"}')
+    result = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "runner" / "campaign.py"),
+            "--contract",
+            str(FULL_EXAMPLE),
+            "--preflight-only",
+            "--proxy-config",
+            str(_proxy(tmp_path)),
+            "--vm-secret-mount",
+            f"{secret}:/opt/osworld/secrets/google.json",
+            "--result-root",
+            str(result_root),
+        ],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    preflight = json.loads(result.stdout.removeprefix("PREFLIGHT_OK "))
+    assert preflight["task_count"] == 369
+    assert preflight["capabilities"]["proxy"]["required_task_count"] == 56
+    assert len(preflight["capabilities"]["secret_mounts"]) == 1
     assert not result_root.exists()
 
 

@@ -135,6 +135,33 @@ async def test_campaign_resume_appends_attempt_without_deleting_prior_evidence(
     assert len((run_root / "attempts.jsonl").read_text().splitlines()) == 6
 
 
+@pytest.mark.asyncio
+async def test_noop_resume_preserves_observed_parallelism(tmp_path: Path) -> None:
+    run_root = tmp_path / "run"
+    inventory = _inventory([f"task-{index}" for index in range(4)])
+    metadata = {"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE}
+    kwargs = dict(
+        run_root=run_root,
+        inventory=inventory,
+        metadata=metadata,
+        runner=FAKE_RUNNER,
+        osworld_root=tmp_path,
+        template=TEMPLATE,
+        num_envs=2,
+        task_timeout_seconds=2,
+        max_attempts=1,
+        child_environment={"FAKE_DELAY_SECONDS": "0.05"},
+    )
+
+    await execute_campaign(**kwargs)
+    first = json.loads((run_root / "aggregate.json").read_text())
+    await execute_campaign(**kwargs)
+    second = json.loads((run_root / "aggregate.json").read_text())
+
+    assert first["max_observed_children"] == 2
+    assert second == first
+
+
 def test_default_parallelism_is_eight() -> None:
     from runner.campaign import DEFAULT_NUM_ENVS
 

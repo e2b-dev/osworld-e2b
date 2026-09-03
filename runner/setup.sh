@@ -75,4 +75,4 @@ echo
 echo "Done. Next (see README.md):"
 echo "  1. pip install -r $DEST/requirements.txt -r $HERE/requirements-e2b.txt"
 echo "  2. export E2B_API_KEY=..."
-echo "  3. $HERE/run.sh --observation_type screenshot --model <model> --test_all_meta_path ..."
+echo "  3. $HERE/run.sh --contract <reviewed-contract.json> --preflight-only ..."

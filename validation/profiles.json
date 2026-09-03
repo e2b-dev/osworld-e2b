@@ -4,7 +4,7 @@
     "current-v1": {
       "commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
       "repository": "https://github.com/xlang-ai/OSWorld.git",
-      "runner": "scripts/python/run_multienv.py",
+      "runner": "scripts/python/run_multienv_qwen3vl.py",
       "source_commit_provenance": "verified_official_upstream",
       "suites": {
         "all": {

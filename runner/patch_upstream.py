@@ -89,6 +89,20 @@ def _runner(source: str) -> str:
 
 def _qwen_runner(source: str) -> str:
     source = _runner(source)
+    mount_argument = '    parser.add_argument("--vm_secret_mount", action="append", default=None)\n'
+    if mount_argument not in source:
+        anchor = '    parser.add_argument("--path_to_vm", type=str, default=None)\n'
+        if anchor not in source:
+            raise RuntimeError("Qwen runner VM-path anchor not found; OSWorld contract moved")
+        source = source.replace(anchor, anchor + mount_argument, 1)
+    mount_forwarding = "            vm_secret_mounts=args.vm_secret_mount,\n"
+    if mount_forwarding not in source:
+        anchor = "            client_password=args.client_password,\n"
+        if anchor not in source:
+            raise RuntimeError(
+                "Qwen runner DesktopEnv constructor anchor not found; OSWorld contract moved"
+            )
+        source = source.replace(anchor, anchor + mount_forwarding, 1)
     api_argument = (
         '    parser.add_argument("--api_backend", choices=["openai", "dashscope"], '
         'default="openai")\n'

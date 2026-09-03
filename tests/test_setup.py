@@ -42,8 +42,12 @@ def _checkout(
     )
     (scripts / "run_multienv_qwen3vl.py").write_text(
         'LOG = os.path.join("logs", "normal.log")\n'
+        '    parser.add_argument("--path_to_vm", type=str, default=None)\n'
         'parser.add_argument("--provider_name", choices=["docker", "daytona"])\n'
         "    # example config\n"
+        "env = DesktopEnv(\n"
+        "            client_password=args.client_password,\n"
+        ")\n"
         "agent = Qwen3VLAgent(\n"
         "            model=args.model,\n"
         ")\n\n\n"
@@ -74,6 +78,8 @@ def test_upstream_patcher_is_deterministic_and_idempotent(tmp_path: Path) -> Non
     assert "OSWORLD_LOG_DIR" in generic
     assert 'parser.add_argument("--api_backend", choices=["openai", "dashscope"]' in qwen
     assert "api_backend=args.api_backend" in qwen
+    assert 'parser.add_argument("--vm_secret_mount"' in qwen
+    assert "vm_secret_mounts=args.vm_secret_mount" in qwen
 
 
 @pytest.mark.parametrize(

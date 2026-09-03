@@ -136,10 +136,16 @@ async def execute_campaign(
     metadata = {**metadata, "capabilities": capabilities.to_dict()}
     sensitive_values = collect_redaction_values(proxy_config, secret_mounts)
     run_root = Path(run_root)
+    previous_max_observed_children = 0
     if (run_root / "run.json").exists():
         ledger = RunLedger.open(run_root)
         if ledger.document["metadata"] != metadata or list(ledger.tasks) != tasks:
             raise ValueError("campaign identity differs from the existing run")
+        try:
+            previous_aggregate = json.loads((run_root / "aggregate.json").read_text())
+            previous_max_observed_children = int(previous_aggregate.get("max_observed_children", 0))
+        except (OSError, ValueError, json.JSONDecodeError):
+            previous_max_observed_children = 0
     else:
         ledger = RunLedger.create(run_root, metadata=metadata, tasks=tasks)
 
@@ -148,7 +154,7 @@ async def execute_campaign(
     semaphore = asyncio.Semaphore(num_envs)
     counter_lock = asyncio.Lock()
     active_children = 0
-    max_observed_children = 0
+    max_observed_children = previous_max_observed_children
 
     async def run_attempt(task: TaskKey, attempt: int, candidate_index: int) -> None:
         nonlocal active_children, max_observed_children

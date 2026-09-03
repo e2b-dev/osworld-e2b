@@ -21,26 +21,21 @@
     }
   },
   "benchmark": {
-    "commit": "fe8c78e15a1149e82d54137e9ffef18aee710ed7",
-    "inventory_sha256": "e4df86d07489d72503192c3d276a0569a5ee02f16ce8c644d7622e04c518081e",
-    "profile": "ui-mopd-qwen3vl-docker",
+    "commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+    "inventory_sha256": "4386bfed910f60a016e8a81b1a792c258a2f688318abdafc1cb2ca4ba00d3e96",
+    "profile": "current-v1",
     "repository": "https://github.com/xlang-ai/OSWorld.git",
-    "suite": "nogdrive",
-    "task_count": 361
+    "suite": "all",
+    "task_count": 369
   },
   "comparison": {
-    "mode": "public_docker_parity",
-    "absolute_score_delta_lte": 0.03,
-    "reference_dataset_commit": "a518b8776c172c9456f85b3fa5ef451d326a7969",
-    "reference_score": 0.36784545558256826,
-    "reference_scored_tasks": 359,
-    "reference_total_tasks": 361
+    "mode": "none"
   },
   "execution": {
     "execution_authorized": false,
     "max_attempts_per_task": 2,
     "model_call_attempts": 5,
-    "model_request_cap": 180500,
+    "model_request_cap": 184500,
     "sandbox_concurrency_cap": 8,
     "task_timeout_seconds": 1800
   },

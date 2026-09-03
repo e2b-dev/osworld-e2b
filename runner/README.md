@@ -1,76 +1,92 @@
-# Run OSWorld with the E2B provider
+# Run OSWorld with E2B
 
-The relay creates a restricted-ingress E2B sandbox, proxies OSWorld's HTTP and
-Chrome WebSocket traffic, and replaces the sandbox on every snapshot revert.
-The traffic token stays in the relay process and is never passed to OSWorld.
-
-## Setup
+## Prepare a pinned checkout
 
 ```bash
-runner/setup.sh
+runner/setup.sh --profile current-v1
 uv sync --locked --all-groups
 uv pip install -r runner/OSWorld/requirements.txt -r runner/requirements-e2b.txt
 ```
 
-`setup.sh` fetches the exact commit in `upstream.lock.json`, verifies its Git
-identity and origin, rejects unrelated checkout changes, and applies the same
-adapter patch deterministically on every run.
+`current-v1` is the default and contains `all` (369), `nogdrive` (361), and `gdrive` (8). Use
+`--profile ui-mopd-qwen3vl-docker` for the historical public Docker comparison. Setup fetches the
+exact commit, verifies its origin and generated inventory, rejects unrelated checkout changes, and
+applies the same E2B boundary patch deterministically.
 
-Build the template from the repository root and use the immutable build
-reference printed by the build command:
+Build the Template and retain the immutable reference printed by the build:
 
 ```bash
 export E2B_API_KEY='...'
 npm run build
-export GUEST_TEMPLATE='osworld-gnome-<recipe-digest-prefix>:<build-id>'
 ```
 
-The manager, relay, validation script, and normal run script reject a missing
-or mutable `GUEST_TEMPLATE` before a sandbox is created.
+Only `name:build_id` is accepted by the run contract. Mutable template names are rejected before
+any sandbox is created.
 
-## Fixed environment-path validation
+## Run preflight
+
+The examples intentionally contain `route.final: false` and `execution_authorized: false`.
 
 ```bash
-./validate.sh
+mkdir -p results
+cp validation/full-suite-contract.example.json results/full-suite-contract.json
+
+runner/run.sh \
+  --contract results/full-suite-contract.json \
+  --preflight-only \
+  --proxy-config "$PROXY_CONFIG_FILE" \
+  --vm-secret-mount "$GOOGLE_SECRET:/opt/osworld/secrets/google.json"
 ```
 
-This runs `validation/manifest.json` twice. Output JSON, JSONL, and relay logs
-are written to `results/`. `PATH_PASS` means OSWorld's setup, observation,
-action, and evaluator paths completed; it is not task success.
+For the 361-task public comparison, use `validation/validation-contract.example.json` and omit the
+Google mount. A proxy remains required because 45 tasks in that historical inventory declare
+`proxy=true`.
 
-## Agent run
+Preflight checks source and inventory identities, runner and model settings, immutable route
+syntax, proxy capability, secret mount constraints, timeout/retry limits, sandbox concurrency, and
+the independent worst-case model request cap. It performs no paid E2B or model work.
 
-Pass normal OSWorld arguments after `run.sh`:
+## Authorize and execute
+
+Create an operator-owned contract under ignored `results/`, set its template to the emitted
+`name:build_id`, set `route.final: true`, and define every endpoint label in the environment. Review
+the task count and both caps, then set `execution_authorized: true` only when that exact paid run is
+authorized.
 
 ```bash
-./run.sh \
-  --observation_type screenshot \
-  --model <model> \
-  --test_all_meta_path evaluation_examples/test_small.json \
-  --client_password password
+export QWEN_ENDPOINT_0='http://model-host-0.example/v1'
+
+runner/run.sh \
+  --contract results/parity-contract.json \
+  --proxy-config "$PROXY_CONFIG_FILE" \
+  --num-envs 8 \
+  --run-id qwen-e2b-parity
 ```
 
-## Mid-run snapshots
+To resume, repeat the command with the same contract and `--run-id`. Identity drift is rejected.
+Tasks already holding valid terminal results are skipped; invalid and crash-visible attempts retry
+only within the contract limit.
 
-OSWorld's `save_state(snapshot_name)` maps to an E2B snapshot of the running
-guest — memory and filesystem are captured, the sandbox pauses for a few
-seconds and resumes. A later `revert_to_snapshot` with the same name creates a
-fresh sandbox in that exact state; one snapshot can seed any number of
-sandboxes. Names that were never saved (including OSWorld's default
-`init_state`) revert to the template base state instead. To verify live
-against a running relay:
+Each task process owns a relay with a unique dynamic port bundle and one sandbox. Result paths,
+logs, relay events, and traffic tokens are private to that attempt, so task-level parallelism is the
+default. The sandbox cap controls simultaneous environments. Endpoint labels are assigned
+round-robin and the model request cap remains independent because model-serving capacity may be
+shared even though sandboxes are not.
+
+Every scheduled attempt is represented in `results/runs/<run-id>/attempts.jsonl`. Per-attempt
+directories retain all produced upstream artifacts and checksum catalogs. `aggregate.json` is
+updated atomically and separates valid zeros from infrastructure-invalid outcomes.
+
+## Environment-path smoke validation
 
 ```bash
-python3 snapshot_probe.py
+export GUEST_TEMPLATE='osworld-gnome-<digest>:<build-id>'
+runner/validate.sh
 ```
 
-Useful settings:
+This runs the named 24-task smoke manifest twice. `PATH_PASS` means reset, setup, observation,
+action, and evaluator transport worked; it is not a benchmark task pass.
 
-- `SANDBOX_TIMEOUT_S` controls the E2B sandbox lifetime in seconds (default
-  3600; account-tier limits still apply).
-- `RELAY_HTTP_TIMEOUT_S` controls one proxied HTTP request (default 240).
-- `GUEST_READY_TIMEOUT_S` controls guest readiness waiting (default 180).
-
-The adapter runs headless and returns 0 for OSWorld's VNC port. One relay
-process supports one OSWorld environment; parallel runs need separate port
-namespaces or one relay process per isolated host/container.
+Useful relay settings are `SANDBOX_TIMEOUT_S` (default 3600), `RELAY_HTTP_TIMEOUT_S` (default 240),
+and `GUEST_READY_TIMEOUT_S` (default 180). The headless adapter reports VNC port 0 because OSWorld
+uses the relay's HTTP, CDP, and VLC endpoints instead.

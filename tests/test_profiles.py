@@ -48,6 +48,7 @@ def test_current_profile_covers_the_complete_official_suites() -> None:
     profile = select_profile("current-v1", PROFILES)
 
     assert profile["commit"] == "fc31a9049664292fcb35d6e501ee1dc839f2cf6d"
+    assert profile["runner"] == "scripts/python/run_multienv_qwen3vl.py"
     assert load_inventory(INVENTORIES / "current-v1-all.json")["task_count"] == 369
     assert load_inventory(INVENTORIES / "current-v1-nogdrive.json")["task_count"] == 361
     assert load_inventory(INVENTORIES / "current-v1-gdrive.json")["task_count"] == 8

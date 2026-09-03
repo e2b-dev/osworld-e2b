@@ -117,17 +117,22 @@ def validate_contract(
             f"model_request_cap {model_cap} is below the worst-case bound {worst_case_requests}"
         )
 
-    if comparison.get("reference_dataset_commit") != REFERENCE_DATASET_COMMIT:
-        raise ValueError("comparison reference dataset commit does not match")
-    if (
-        comparison.get("reference_total_tasks") != 361
-        or comparison.get("reference_scored_tasks") != 359
-    ):
-        raise ValueError("comparison reference task counts do not match")
-    if not math.isclose(comparison.get("reference_score", -1), REFERENCE_SCORE, abs_tol=1e-15):
-        raise ValueError("comparison reference score does not match")
-    if comparison.get("absolute_score_delta_lte") != 0.03:
-        raise ValueError("comparison acceptance band must equal 0.03")
+    if profile_name == "ui-mopd-qwen3vl-docker":
+        if comparison.get("mode") != "public_docker_parity":
+            raise ValueError("parity comparison mode must be public_docker_parity")
+        if comparison.get("reference_dataset_commit") != REFERENCE_DATASET_COMMIT:
+            raise ValueError("comparison reference dataset commit does not match")
+        if (
+            comparison.get("reference_total_tasks") != 361
+            or comparison.get("reference_scored_tasks") != 359
+        ):
+            raise ValueError("comparison reference task counts do not match")
+        if not math.isclose(comparison.get("reference_score", -1), REFERENCE_SCORE, abs_tol=1e-15):
+            raise ValueError("comparison reference score does not match")
+        if comparison.get("absolute_score_delta_lte") != 0.03:
+            raise ValueError("comparison acceptance band must equal 0.03")
+    elif comparison != {"mode": "none"}:
+        raise ValueError("current-suite contracts must disable historical comparison")
 
     if for_execution:
         if execution.get("execution_authorized") is not True:

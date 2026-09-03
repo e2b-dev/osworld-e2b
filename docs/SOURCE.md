@@ -1,19 +1,32 @@
 # Source and ownership
 
-The E2B-native implementation was curated from its pre-publication working tree. That source tree
-was not itself a Git repository. Only the following implementation families are part of this
-repository:
+This repository owns the E2B provider boundary, Template recipe, relay, campaign accounting,
+validation contracts, generated task inventories, tests, and operator documentation. It does not
+vendor OSWorld.
 
-- `template/build.ts`, `template/template.ts`, and the explicitly listed guest files;
-- `realkit/*.py`;
-- safe scripts and dependency pins under `runner/`;
-- tests and task-ID-only validation manifests; and
-- package locks and public operator documentation.
+Official upstream source is fetched from `https://github.com/xlang-ai/OSWorld.git` into the ignored
+`runner/OSWorld/` directory. `validation/profiles.json` is authoritative for runnable source:
 
-The nested `runner/OSWorld` checkout is not a source for repository history. It is fetched by
-`runner/setup.sh` from `https://github.com/xlang-ai/OSWorld.git` at the commit recorded in
-`upstream.lock.json`. Dotenv files, dependencies, build output, caches, local distributions,
-generated evidence, raw trajectories, and experiment probes are outside the public artifact.
+- `current-v1` pins verified official commit
+  `fc31a9049664292fcb35d6e501ee1dc839f2cf6d`;
+- `ui-mopd-qwen3vl-docker` pins
+  `fe8c78e15a1149e82d54137e9ffef18aee710ed7`, inferred as the official main revision corresponding
+  to the public run date because that result did not record an OSWorld SHA.
+
+Each committed inventory is generated directly from the selected checkout. It records the source
+commit, official suite manifest, task-file SHA-256 values, proxy flags, evaluator-tree digest, and
+whole-inventory digest. Setup verifies these bytes before applying a deterministic patch limited to
+the E2B provider factory, fresh-reset behavior, supported upstream runners, and generated adapter
+files. Task definitions and evaluator implementations are never rewritten.
+
+`upstream.lock.json` and `template/inputs.lock.json` pin the current Template input. Historical
+comparison identity and the public result artifact are separately pinned in
+`validation/profiles.json` and `validation/reference/ui-mopd-qwen3vl-docker.json`.
+
+The public implementation families are `template/`, `realkit/`, safe scripts and dependency pins
+under `runner/`, generated validation metadata, tests, package locks, and documentation. Dotenv
+files, dependencies, build output, caches, local distributions, fetched upstream checkouts, raw
+trajectories, credentials, and generated campaign bundles are outside the public artifact.
 
 `template/files/server/main.py` and `template/files/server/pyxcursor.py` derive from the pinned
 OSWorld server package. Their attribution and modifications are recorded in `NOTICE`.

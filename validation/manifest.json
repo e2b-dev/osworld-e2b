@@ -1,7 +1,7 @@
 {
-  "name": "osworld-e2b-environment-path-v1",
-  "description": "A fixed, cross-application environment-path sample. It excludes tasks that declare proxy=true because this integration does not configure OSWorld's proxy service.",
-  "osworld_commit": "7a17d3abc86d524420ea4ec96752f84d245fea74",
+  "name": "osworld-e2b-environment-path-smoke-v1",
+  "description": "A fixed 24-task cross-application smoke lane for environment-path checks. It is not the full-suite support boundary.",
+  "osworld_commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
   "tasks": [
     {"domain": "chrome", "id": "030eeff7-b492-4218-b312-701ec99ee0cc"},
     {"domain": "chrome", "id": "2ad9387a-65d8-4e33-ad5b-7580065a27ca"},

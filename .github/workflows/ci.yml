@@ -27,6 +27,23 @@ jobs:
           node-version: "22"
           cache: npm
       - run: uv sync --locked --all-groups
+      - name: Verify pinned OSWorld inventories
+        run: |
+          git clone --filter=blob:none --no-checkout https://github.com/xlang-ai/OSWorld.git "$RUNNER_TEMP/osworld"
+          git -C "$RUNNER_TEMP/osworld" fetch --depth=1 origin fc31a9049664292fcb35d6e501ee1dc839f2cf6d
+          git -C "$RUNNER_TEMP/osworld" checkout --detach fc31a9049664292fcb35d6e501ee1dc839f2cf6d
+          for suite in all nogdrive gdrive; do
+            uv run python runner/build_inventory.py \
+              --profile current-v1 --suite "$suite" \
+              --checkout "$RUNNER_TEMP/osworld" \
+              --output "validation/inventories/current-v1-${suite}.json" --check
+          done
+          git -C "$RUNNER_TEMP/osworld" fetch --depth=1 origin fe8c78e15a1149e82d54137e9ffef18aee710ed7
+          git -C "$RUNNER_TEMP/osworld" checkout --detach fe8c78e15a1149e82d54137e9ffef18aee710ed7
+          uv run python runner/build_inventory.py \
+            --profile ui-mopd-qwen3vl-docker --suite nogdrive \
+            --checkout "$RUNNER_TEMP/osworld" \
+            --output validation/inventories/ui-mopd-qwen3vl-docker-nogdrive.json --check
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run ruff format --check .
@@ -40,8 +57,9 @@ jobs:
           bash -n runner/*.sh scripts/*.sh template/files/*.sh
           python3 -m json.tool upstream.lock.json >/dev/null
           python3 -m json.tool template/inputs.lock.json >/dev/null
-          for file in validation/*.json; do python3 -m json.tool "$file" >/dev/null; done
+          find validation -name '*.json' -type f -exec python3 -m json.tool {} \; >/dev/null
       - run: uv run python scripts/check_public_tree.py
+      - run: uv run python scripts/check_ci_policy.py
 
   secrets:
     runs-on: ubuntu-latest
