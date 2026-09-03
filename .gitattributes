@@ -1,0 +1,3 @@
+# Preserve attributed upstream server formatting; maintained files keep Git's whitespace checks.
+template/files/server/main.py -whitespace
+template/files/server/pyxcursor.py -whitespace

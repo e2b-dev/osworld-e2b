@@ -15,7 +15,11 @@ dist/
 *.egg-info/
 results/
 repro/
+artifacts/
+out/
 runner/OSWorld/
 *.log
 *.pid
 *.token
+.coverage
+htmlcov/

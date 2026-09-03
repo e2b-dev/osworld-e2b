@@ -1,0 +1,31 @@
+{
+  "name": "osworld-e2b-environment-path-v1",
+  "description": "A fixed, cross-application environment-path sample. It excludes tasks that declare proxy=true because this integration does not configure OSWorld's proxy service.",
+  "osworld_commit": "7a17d3abc86d524420ea4ec96752f84d245fea74",
+  "tasks": [
+    {"domain": "chrome", "id": "030eeff7-b492-4218-b312-701ec99ee0cc"},
+    {"domain": "chrome", "id": "2ad9387a-65d8-4e33-ad5b-7580065a27ca"},
+    {"domain": "chrome", "id": "2ae9ba84-3a0d-4d4c-8338-3a1478dc5fe3"},
+    {"domain": "chrome", "id": "12086550-11c0-466b-b367-1d9e75b3910e"},
+    {"domain": "gimp", "id": "045bf3ff-9077-4b86-b483-a1040a949cff"},
+    {"domain": "gimp", "id": "06ca5602-62ca-47f6-ad4f-da151cde54cc"},
+    {"domain": "libreoffice_calc", "id": "01b269ae-2111-4a07-81fd-3fcd711993b0"},
+    {"domain": "libreoffice_calc", "id": "0326d92d-d218-48a8-9ca1-981cd6d064c7"},
+    {"domain": "libreoffice_calc", "id": "035f41ba-6653-43ab-aa63-c86d449d62e5"},
+    {"domain": "libreoffice_impress", "id": "04578141-1d42-4146-b9cf-6fab4ce5fd74"},
+    {"domain": "libreoffice_impress", "id": "05dd4c1d-c489-4c85-8389-a7836c4f0567"},
+    {"domain": "libreoffice_writer", "id": "0810415c-bde4-4443-9047-d5f70165a697"},
+    {"domain": "libreoffice_writer", "id": "0a0faba3-5580-44df-965d-f562a99b291c"},
+    {"domain": "libreoffice_writer", "id": "0b17a146-2934-46c7-8727-73ff6b6483e8"},
+    {"domain": "multi_apps", "id": "00fa164e-2612-4439-992e-157d019a8436"},
+    {"domain": "os", "id": "13584542-872b-42d8-b299-866967b5c3ef"},
+    {"domain": "os", "id": "23393935-50c7-4a86-aeea-2b78fd089c5c"},
+    {"domain": "thunderbird", "id": "08c73485-7c6d-4681-999d-919f5c32dcfa"},
+    {"domain": "thunderbird", "id": "10a730d5-d414-4b40-b479-684bed1ae522"},
+    {"domain": "vlc", "id": "215dfd39-f493-4bc3-a027-8a97d72c61bf"},
+    {"domain": "vlc", "id": "386dbd0e-0241-4a0a-b6a2-6704fba26b1c"},
+    {"domain": "vlc", "id": "59f21cfb-0120-4326-b255-a5b827b38967"},
+    {"domain": "vs_code", "id": "0512bb38-d531-4acf-9e7e-0add90816068"},
+    {"domain": "vs_code", "id": "0ed39f63-6049-43d4-ba4d-5fa2fe04a951"}
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "name": "osworld-e2b-proxy-required-diagnostic",
+  "description": "Diagnostic only. This task declares proxy=true and must not be used to draw direct-egress conclusions when OSWorld proxy support is disabled.",
+  "osworld_commit": "7a17d3abc86d524420ea4ec96752f84d245fea74",
+  "tasks": [
+    {"domain": "chrome", "id": "06fe7178-4491-4589-810f-2e2bc9502122", "requires_proxy": true}
+  ]
+}

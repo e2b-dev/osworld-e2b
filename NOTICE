@@ -1,0 +1,15 @@
+OSWorld on E2B
+Copyright 2026 E2B, Inc.
+
+This product includes software derived from OSWorld at commit
+7a17d3abc86d524420ea4ec96752f84d245fea74, Copyright 2024 XLANG NLP Lab,
+licensed under the Apache License, Version 2.0.
+
+The following files originate from OSWorld's desktop_env/server package:
+
+- template/files/server/main.py: modified by E2B to tolerate transient AT-SPI objects with null
+  names, roles, action descriptions, or key bindings.
+- template/files/server/pyxcursor.py: copied without functional changes.
+
+The remaining E2B adapter, relay, Template, setup, and validation code is maintained in this
+repository.
