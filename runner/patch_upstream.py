@@ -12,6 +12,7 @@ from pathlib import Path
 OWNED_TRACKED_PATHS = {
     "desktop_env/desktop_env.py",
     "desktop_env/providers/__init__.py",
+    "mm_agents/qwen3vl_agent.py",
     "scripts/python/run_multienv.py",
     "scripts/python/run_multienv_qwen3vl.py",
 }
@@ -123,9 +124,20 @@ def _qwen_runner(source: str) -> str:
     return source
 
 
+def _qwen_agent(source: str) -> str:
+    compatible = "    def reset(self, _logger=None, vm_ip=None):\n"
+    if compatible in source:
+        return source
+    anchor = "    def reset(self, _logger=None):\n"
+    if anchor not in source:
+        raise RuntimeError("Qwen agent reset anchor not found; OSWorld contract moved")
+    return source.replace(anchor, compatible, 1)
+
+
 TRANSFORMS = {
     "desktop_env/providers/__init__.py": _provider_factory,
     "desktop_env/desktop_env.py": _desktop_env,
+    "mm_agents/qwen3vl_agent.py": _qwen_agent,
     "scripts/python/run_multienv.py": _runner,
     "scripts/python/run_multienv_qwen3vl.py": _qwen_runner,
 }

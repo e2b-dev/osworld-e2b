@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 from pathlib import Path
 
@@ -51,6 +52,11 @@ def _checkout(
         "agent = Qwen3VLAgent(\n"
         "            model=args.model,\n"
         ")\n\n\n"
+    )
+    agents = checkout / "mm_agents"
+    agents.mkdir()
+    (agents / "qwen3vl_agent.py").write_text(
+        "class Qwen3VLAgent:\n    def reset(self, _logger=None):\n        self.logger = _logger\n"
     )
     _run("git", "add", ".", cwd=checkout)
     _run("git", "commit", "-qm", "fixture", cwd=checkout)
@@ -110,6 +116,23 @@ def test_upstream_patcher_rejects_the_wrong_commit(tmp_path: Path) -> None:
 
     assert result.returncode == 1
     assert "commit mismatch" in result.stderr
+
+
+def test_patched_qwen_agent_reset_accepts_vm_ip_without_changing_logger(tmp_path: Path) -> None:
+    checkout, head = _checkout(tmp_path)
+
+    result = _run("python3", str(PATCHER), str(checkout), "--expected-commit", head)
+
+    assert result.returncode == 0, result.stdout + result.stderr
+    agent_path = checkout / "mm_agents" / "qwen3vl_agent.py"
+    spec = importlib.util.spec_from_file_location("fixture_qwen3vl_agent", agent_path)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    logger = object()
+    agent = module.Qwen3VLAgent()
+    agent.reset(logger, vm_ip="127.0.0.1")
+    assert agent.logger is logger
 
 
 def test_upstream_patcher_rejects_unowned_tracked_changes(tmp_path: Path) -> None:
