@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 import time
 from pathlib import Path
 
@@ -32,6 +33,7 @@ async def test_campaign_runs_in_parallel_and_accounts_for_all_tasks(tmp_path: Pa
     started = time.monotonic()
 
     ledger = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=tmp_path / "run",
         inventory=_inventory(task_ids),
         metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
@@ -65,6 +67,7 @@ async def test_campaign_preserves_distinct_invalid_outcomes_and_valid_zero(tmp_p
         "task-cleanup": "cleanup_failed",
     }
     ledger = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=tmp_path / "run",
         inventory=_inventory(list(outcomes)),
         metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
@@ -101,6 +104,7 @@ async def test_campaign_resume_appends_attempt_without_deleting_prior_evidence(
     inventory = _inventory(["task-a"])
     metadata = {"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE}
     first = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=run_root,
         inventory=inventory,
         metadata=metadata,
@@ -116,6 +120,7 @@ async def test_campaign_resume_appends_attempt_without_deleting_prior_evidence(
     assert first_attempt.exists()
 
     second = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=run_root,
         inventory=inventory,
         metadata=metadata,
@@ -141,6 +146,7 @@ async def test_noop_resume_preserves_observed_parallelism(tmp_path: Path) -> Non
     inventory = _inventory([f"task-{index}" for index in range(4)])
     metadata = {"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE}
     kwargs = dict(
+        python_executable=Path(sys.executable),
         run_root=run_root,
         inventory=inventory,
         metadata=metadata,
@@ -174,6 +180,7 @@ def test_campaign_rejects_mutable_template_before_creating_run(tmp_path: Path) -
 
         asyncio.run(
             execute_campaign(
+                python_executable=Path(sys.executable),
                 run_root=tmp_path / "run",
                 inventory=_inventory(["task-a"]),
                 metadata={"profile": "fixture"},
@@ -191,6 +198,7 @@ def test_campaign_rejects_mutable_template_before_creating_run(tmp_path: Path) -
 @pytest.mark.asyncio
 async def test_every_attempt_has_raw_logs_and_artifact_checksums(tmp_path: Path) -> None:
     ledger = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=tmp_path / "run",
         inventory=_inventory(["task-a"]),
         metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
@@ -219,6 +227,7 @@ async def test_campaign_injects_but_does_not_retain_secret_source_path_or_bytes(
     inventory = _inventory(["task-a"])
 
     ledger = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=tmp_path / "run",
         inventory=inventory,
         metadata={"profile": "fixture", "suite": "gdrive", "template": TEMPLATE},
@@ -244,6 +253,7 @@ async def test_campaign_injects_but_does_not_retain_secret_source_path_or_bytes(
 async def test_campaign_redacts_secrets_supplied_in_child_environment(tmp_path: Path) -> None:
     secret = "fireworks-secret-value"
     ledger = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=tmp_path / "run",
         inventory=_inventory(["task-a"]),
         metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
@@ -273,6 +283,7 @@ async def test_campaign_adds_osworld_root_to_child_pythonpath(tmp_path: Path) ->
     osworld_root = tmp_path / "OSWorld"
     osworld_root.mkdir()
     ledger = await execute_campaign(
+        python_executable=Path(sys.executable),
         run_root=tmp_path / "run",
         inventory=_inventory(["task-a"]),
         metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
@@ -290,3 +301,53 @@ async def test_campaign_adds_osworld_root_to_child_pythonpath(tmp_path: Path) ->
     stdout = (ledger.root / "attempts" / "chrome" / "task-a" / "1" / "stdout.log").read_text()
 
     assert f"PYTHONPATH {osworld_root}:/existing/pythonpath" in stdout
+
+
+@pytest.mark.asyncio
+async def test_campaign_launches_children_with_the_declared_python_interpreter(
+    tmp_path: Path,
+) -> None:
+    marker = tmp_path / "interpreter-used"
+    interpreter = tmp_path / "python"
+    interpreter.write_text(
+        f"#!/bin/sh\nprintf launched > '{marker}'\nexec '{sys.executable}' \"$@\"\n"
+    )
+    interpreter.chmod(0o755)
+
+    await execute_campaign(
+        python_executable=interpreter,
+        run_root=tmp_path / "run",
+        inventory=_inventory(["task-a"]),
+        metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
+        runner=FAKE_RUNNER,
+        osworld_root=tmp_path,
+        template=TEMPLATE,
+        num_envs=1,
+        task_timeout_seconds=2,
+        max_attempts=1,
+    )
+
+    assert marker.read_text() == "launched"
+
+
+@pytest.mark.asyncio
+async def test_campaign_rejects_interpreter_identity_drift_on_resume(tmp_path: Path) -> None:
+    first_interpreter = tmp_path / "python-first"
+    second_interpreter = tmp_path / "python-second"
+    first_interpreter.symlink_to(sys.executable)
+    second_interpreter.symlink_to(sys.executable)
+    kwargs = {
+        "run_root": tmp_path / "run",
+        "inventory": _inventory(["task-a"]),
+        "metadata": {"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
+        "runner": FAKE_RUNNER,
+        "osworld_root": tmp_path,
+        "template": TEMPLATE,
+        "num_envs": 1,
+        "task_timeout_seconds": 2,
+        "max_attempts": 1,
+    }
+    await execute_campaign(python_executable=first_interpreter, **kwargs)
+
+    with pytest.raises(ValueError, match="campaign identity differs"):
+        await execute_campaign(python_executable=second_interpreter, **kwargs)

@@ -24,7 +24,9 @@
 
 ---
 
-## Pre-merge work
+## Established merge foundation
+
+The following requirements are implemented and remain mandatory CI gates for the integration.
 
 ### Task 1: Reproducible Python 3.12 OSWorld runtime
 
@@ -46,7 +48,7 @@
 - Produces: `execute_campaign(..., python_executable: Path, ...) -> RunLedger`; every child uses the declared OSWorld interpreter rather than the coordinator interpreter.
 - Produces: runtime identity in `run.json` containing exact Python, Anthropic, OSWorld, E2B SDK, and runner identities.
 
-- [ ] **Step 1: Write failing runtime-contract tests**
+- [x] **Step 1: Write failing runtime-contract tests**
 
 ```python
 def test_supported_runtime_is_exact():
@@ -65,15 +67,15 @@ async def test_campaign_uses_declared_osworld_interpreter(tmp_path):
     assert str(interpreter) in read_started_command(ledger)
 ```
 
-- [ ] **Step 2: Run the focused tests and verify the missing contract and `sys.executable` launch fail**
+- [x] **Step 2: Run the focused tests and verify the missing contract and `sys.executable` launch fail**
 
 Run: `uv run pytest tests/test_runtime_contract.py tests/test_campaign.py -q`
 
 Expected: FAIL because the runtime contract and `python_executable` parameter do not exist.
 
-- [ ] **Step 3: Pin and install the supported host runtime**
+- [x] **Step 3: Pin and install the supported host runtime**
 
-Create `runner/runtime-contract.json` with Python `>=3.12,<3.13`, Anthropic `0.84.0`, and E2B `2.33.0`. Make setup initialize the pinned upstream submodules through HTTPS, run `uv sync --project "$DEST" --locked`, and verify:
+`runner/runtime-contract.json` requires Python `>=3.12,<3.13`, Anthropic `0.84.0`, and E2B `2.33.0`. Setup initializes the pinned upstream submodules through HTTPS and runs `uv sync --project "$DEST" --frozen`. Frozen mode consumes the exact committed upstream lock because the pinned upstream commit added Daytona and Volcengine declarations without refreshing that lock; those providers are outside the E2B execution path. Setup then adds the pinned E2B adapter requirements and verifies:
 
 ```bash
 "$DEST/.venv/bin/python" -c 'import anthropic, sys; assert sys.version_info[:2] == (3, 12); assert anthropic.__version__ == "0.84.0"'
@@ -81,7 +83,7 @@ Create `runner/runtime-contract.json` with Python `>=3.12,<3.13`, Anthropic `0.8
 
 Do not install OSWorld's unpinned `requirements.txt` into the repository development environment.
 
-- [ ] **Step 4: Pass the selected interpreter into every child**
+- [x] **Step 4: Pass the selected interpreter into every child**
 
 Add the required keyword argument:
 
@@ -108,11 +110,11 @@ async def execute_campaign(
 
 Resolve it once, require an executable file, use it as `command[0]`, and put its version identity in the campaign fingerprint before creating a sandbox.
 
-- [ ] **Step 5: Add clean-install CI coverage**
+- [x] **Step 5: Add clean-install CI coverage**
 
 Use Python 3.12, run setup in a temporary checkout, execute the interpreter identity probe, and run MiniMax `--preflight-only`. Keep credentialed execution outside CI.
 
-- [ ] **Step 6: Verify and commit**
+- [x] **Step 6: Verify and commit**
 
 Run: `uv run pytest tests/test_runtime_contract.py tests/test_campaign.py tests/test_runner_setup.py -q`
 
@@ -142,7 +144,7 @@ git commit -m "fix: pin the OSWorld execution runtime"
 - Produces: `restore_owned_patch(root: Path) -> None`, restoring only generated E2B changes after rejecting unrelated modifications.
 - Produces: one default checkout path, `runner/OSWorld`, shared by setup, campaign, MiniMax, and documentation.
 
-- [ ] **Step 1: Add a failing real-Git profile-switch test**
+- [x] **Step 1: Add a failing real-Git profile-switch test**
 
 ```python
 def test_setup_switches_profiles_in_one_owned_checkout(tmp_path):
@@ -154,17 +156,17 @@ def test_setup_switches_profiles_in_one_owned_checkout(tmp_path):
     assert git(checkout, "rev-parse", "HEAD") == CURRENT_COMMIT
 ```
 
-- [ ] **Step 2: Verify the current generated patch blocks checkout**
+- [x] **Step 2: Verify the current generated patch blocks checkout**
 
 Run: `uv run pytest tests/test_runner_setup.py::test_setup_switches_profiles_in_one_owned_checkout -q`
 
 Expected: FAIL with Git's local-changes checkout error.
 
-- [ ] **Step 3: Restore only adapter-owned state before switching**
+- [x] **Step 3: Restore only adapter-owned state before switching**
 
 Have `restore_owned_patch` write pristine `HEAD:<path>` bytes to each `OWNED_TRACKED_PATHS` entry and remove only `OWNED_UNTRACKED_FILES` and `OWNED_UNTRACKED_PREFIXES`. First reject every changed or untracked path outside those allowlists. Call it before `git checkout --detach "$PIN"`; never use force checkout, hard reset, or broad clean.
 
-- [ ] **Step 4: Align all default checkout paths**
+- [x] **Step 4: Align all default checkout paths**
 
 Use:
 
@@ -174,13 +176,13 @@ parser.add_argument("--osworld-root", type=Path, default=root / "runner" / "OSWo
 
 Update the runner guide so setup and execution work without undocumented path overrides.
 
-- [ ] **Step 5: Verify both directions, idempotence, and unrelated-change rejection**
+- [x] **Step 5: Verify both directions, idempotence, and unrelated-change rejection**
 
 Run: `uv run pytest tests/test_setup.py tests/test_runner_setup.py tests/test_minimax_sample.py -q`
 
 Run setup in a new temporary directory in this order: current, historical, historical, current. Expected: every invocation exits zero and the generated diff is deterministic.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add runner/setup.sh runner/patch_upstream.py runner/campaign.py \
@@ -189,11 +191,12 @@ git add runner/setup.sh runner/patch_upstream.py runner/campaign.py \
 git commit -m "fix: make pinned OSWorld profiles reproducible"
 ```
 
-Tasks 1 and 2 are required before merging even if fidelity and release validation are scheduled later.
+Tasks 1 and 2 remain merge requirements. CI performs a clean runtime installation, MiniMax
+preflight, historical-profile switch, idempotent repeat, and switch back to the current profile.
 
 ---
 
-## Post-merge fidelity work
+## Remaining fidelity work
 
 ### Task 3: Reference-equivalent resources and deterministic packages
 
@@ -409,7 +412,7 @@ Require ten valid evaluator outputs, zero missing tasks, complete checksums, zer
 
 - [ ] **Step 4: Compare diagnostically**
 
-Report score delta, reward agreement, step counts, initial desktop-state comparison, and the AWS/adaptive-thinking limitation. A repeated systematic window mismatch returns to Task 4.
+Report score delta, reward agreement, step counts, initial desktop-state comparison, and the AWS/adaptive-thinking limitation. A repeated systematic window mismatch returns to the deterministic GNOME and application state task.
 
 - [ ] **Step 5: Commit**
 
@@ -544,4 +547,7 @@ git commit -m "feat: validate the OSWorld current-v1 release"
 
 ## Merge boundary
 
-PR #1 may merge as an explicitly experimental, implemented integration after Tasks 1 and 2 pass and its CI is green. It must not be described as fidelity-validated, Docker-equivalent, or publishable until Tasks 3 through 9 pass. If maintainers require the initial merge to contain a validated release rather than experimental integration code, all nine tasks remain pre-merge.
+PR #1 may merge as an explicitly experimental, implemented integration when its required CI is
+green. It must not be described as fidelity-validated, Docker-equivalent, or publishable until
+Tasks 3 through 9 pass. If maintainers require the initial merge to contain a validated release
+rather than experimental integration code, the remaining tasks also become pre-merge requirements.

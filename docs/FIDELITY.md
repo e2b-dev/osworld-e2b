@@ -38,6 +38,21 @@ Template sources, guest files, resource allocation, and lock files. Rolling apt 
 mean the resulting filesystem is not asserted byte-reproducible. The immutable E2B
 `name:build_id`, not the recipe name alone, is the runnable identity.
 
+The host runner uses a separate `runner/OSWorld/.venv`. Setup installs the upstream commit's
+immutable `uv.lock` in frozen mode, then adds the pinned E2B adapter requirements. Frozen mode is
+deliberate: the pinned upstream `pyproject.toml` contains later Daytona and Volcengine declarations
+that were not added to its committed lock, and those provider-specific packages are outside the E2B
+execution path. Setup, the MiniMax environment preflight, and every paid execution use the runtime
+inspector to require Python 3.12, Anthropic 0.84.0, and E2B 2.33.0 and record the executable path,
+OSWorld commit, upstream-lock hash, adapter-requirements hash, runtime-contract hash, runner path,
+and runner hash. A changed interpreter or runtime identity cannot resume an existing campaign. The
+general contract-only preflight remains checkout-independent and performs no paid work.
+
+Setup can switch the same checkout between supported profiles. It first rejects unrelated working
+tree changes, restores only tracked files transformed by the adapter and untracked files copied by
+the adapter, then performs a normal detached checkout. This preserves the upstream checkout and
+never relies on a forced checkout, hard reset, or broad clean.
+
 Every OSWorld environment owns one relay, dynamically allocated control/server/CDP/VLC ports, and
 one E2B sandbox. A reset creates a fresh sandbox. A named `save_state` creates an E2B runtime
 snapshot; reverting creates a new sandbox from that snapshot. Unknown names, including the normal

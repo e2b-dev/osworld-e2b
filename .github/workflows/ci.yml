@@ -11,7 +11,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -21,29 +21,22 @@ jobs:
           enable-cache: true
       - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
-          python-version: "3.11"
+          python-version: "3.12"
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "22"
           cache: npm
       - run: uv sync --locked --all-groups
-      - name: Verify pinned OSWorld inventories
+      - name: Verify clean OSWorld runtime and profile switching
         run: |
-          git clone --filter=blob:none --no-checkout https://github.com/xlang-ai/OSWorld.git "$RUNNER_TEMP/osworld"
-          git -C "$RUNNER_TEMP/osworld" fetch --depth=1 origin fc31a9049664292fcb35d6e501ee1dc839f2cf6d
-          git -C "$RUNNER_TEMP/osworld" checkout --detach fc31a9049664292fcb35d6e501ee1dc839f2cf6d
-          for suite in all nogdrive gdrive; do
-            uv run python runner/build_inventory.py \
-              --profile current-v1 --suite "$suite" \
-              --checkout "$RUNNER_TEMP/osworld" \
-              --output "validation/inventories/current-v1-${suite}.json" --check
-          done
-          git -C "$RUNNER_TEMP/osworld" fetch --depth=1 origin fe8c78e15a1149e82d54137e9ffef18aee710ed7
-          git -C "$RUNNER_TEMP/osworld" checkout --detach fe8c78e15a1149e82d54137e9ffef18aee710ed7
-          uv run python runner/build_inventory.py \
-            --profile ui-mopd-qwen3vl-docker --suite nogdrive \
-            --checkout "$RUNNER_TEMP/osworld" \
-            --output validation/inventories/ui-mopd-qwen3vl-docker-nogdrive.json --check
+          runner/setup.sh --profile current-v1 "$RUNNER_TEMP/osworld"
+          uv run python runner/minimax_sample.py \
+            --osworld-root "$RUNNER_TEMP/osworld" \
+            --template osworld-ci:62e8be41-4106-4850-96ea-afc822735b89 \
+            --preflight-only
+          runner/setup.sh --profile ui-mopd-qwen3vl-docker "$RUNNER_TEMP/osworld"
+          runner/setup.sh --profile ui-mopd-qwen3vl-docker "$RUNNER_TEMP/osworld"
+          runner/setup.sh --profile current-v1 "$RUNNER_TEMP/osworld"
       - run: uv run pytest -q
       - run: uv run ruff check .
       - run: uv run ruff format --check .

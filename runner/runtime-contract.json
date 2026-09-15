@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "python": ">=3.12,<3.13",
+  "anthropic": "0.84.0",
+  "e2b": "2.33.0"
+}

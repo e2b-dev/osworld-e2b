@@ -40,6 +40,8 @@ done
 DEST="${DEST:-$HERE/OSWorld}"
 PIN="$(python3 "$HERE/profile.py" --profiles "$PROFILES" get --name "$PROFILE" --field commit)"
 UPSTREAM="$(python3 "$HERE/profile.py" --profiles "$PROFILES" get --name "$PROFILE" --field repository)"
+RUNNER="$(python3 "$HERE/profile.py" --profiles "$PROFILES" get --name "$PROFILE" --field runner)"
+NEW_CHECKOUT=0
 
 if [ -e "$DEST" ] && [ ! -d "$DEST/.git" ]; then
     echo "destination exists but is not a Git checkout: $DEST" >&2
@@ -47,14 +49,23 @@ if [ -e "$DEST" ] && [ ! -d "$DEST/.git" ]; then
 fi
 if [ ! -d "$DEST/.git" ]; then
     git clone --filter=blob:none --no-checkout "$UPSTREAM" "$DEST"
+    NEW_CHECKOUT=1
 fi
 origin="$(git -C "$DEST" remote get-url origin)"
 case "$origin" in
     "$UPSTREAM"|https://github.com/xlang-ai/OSWorld|git@github.com:xlang-ai/OSWorld.git) ;;
     *) echo "unexpected OSWorld origin: $origin" >&2; exit 1 ;;
 esac
+if [ "$NEW_CHECKOUT" -eq 0 ]; then
+    python3 "$HERE/patch_upstream.py" "$DEST" --restore-owned
+fi
 git -C "$DEST" fetch --quiet --depth=1 origin "$PIN"
 git -C "$DEST" checkout --detach --quiet "$PIN"
+if [ -f "$DEST/.gitmodules" ]; then
+    git -C "$DEST" \
+        -c url.https://github.com/.insteadOf=git@github.com: \
+        submodule update --init --recursive --depth=1
+fi
 python3 "$HERE/profile.py" --profiles "$PROFILES" verify \
     --name "$PROFILE" --checkout "$DEST" --repo-root "$ROOT"
 python3 "$HERE/patch_upstream.py" "$DEST" --expected-commit "$PIN"
@@ -71,8 +82,17 @@ cp "$REALKIT/relay.py" "$DEST/e2b_relay.py"
 cp "$REALKIT/harness.py" "$DEST/e2b_harness.py"
 cp "$REALKIT/e2b_policy.py" "$DEST/e2b_policy.py"
 
+# ---- pinned OSWorld host runtime -----------------------------------------
+command -v uv >/dev/null 2>&1 || { echo "uv is required" >&2; exit 1; }
+uv sync --project "$DEST" --frozen --python 3.12 --no-install-project
+uv pip install --python "$DEST/.venv/bin/python" --requirements "$HERE/requirements-e2b.txt"
+python3 "$HERE/runtime.py" inspect \
+    --python "$DEST/.venv/bin/python" \
+    --osworld-root "$DEST" \
+    --runner "$RUNNER" \
+    --expected-commit "$PIN"
+
 echo
 echo "Done. Next (see README.md):"
-echo "  1. pip install -r $DEST/requirements.txt -r $HERE/requirements-e2b.txt"
-echo "  2. export E2B_API_KEY=..."
-echo "  3. $HERE/run.sh --contract <reviewed-contract.json> --preflight-only ..."
+echo "  1. export E2B_API_KEY=..."
+echo "  2. $HERE/run.sh --contract <reviewed-contract.json> --preflight-only ..."

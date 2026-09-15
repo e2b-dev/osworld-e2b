@@ -1,2 +1,8 @@
 aiohttp==3.14.3
+bracex==3.0.1
+dockerfile-parse==2.0.1
 e2b==2.33.0
+h2==4.4.1
+hpack==4.2.0
+hyperframe==6.1.0
+wcmatch==10.2.1

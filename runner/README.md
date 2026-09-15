@@ -5,13 +5,20 @@
 ```bash
 runner/setup.sh --profile current-v1
 uv sync --locked --all-groups
-uv pip install -r runner/OSWorld/requirements.txt -r runner/requirements-e2b.txt
 ```
 
 `current-v1` is the default and contains `all` (369), `nogdrive` (361), and `gdrive` (8). Use
 `--profile ui-mopd-qwen3vl-docker` for the historical public Docker comparison. Setup fetches the
 exact commit, verifies its origin and generated inventory, rejects unrelated checkout changes, and
-applies the same E2B boundary patch deterministically.
+applies the same E2B boundary patch deterministically. It initializes the pinned submodules over
+HTTPS and creates `runner/OSWorld/.venv` with Python 3.12, Anthropic 0.84.0, E2B 2.33.0, and the
+committed upstream dependency lock. The upstream commit added provider dependencies without
+refreshing its lock, so setup intentionally installs the immutable committed lock in frozen mode;
+the omitted Daytona and Volcengine packages are outside the E2B runner path.
+
+Re-running setup is idempotent. Switching profiles restores only generated adapter-owned files,
+rejects unrelated changes, checks out the requested commit, and reapplies the adapter. It never
+uses a forced checkout, hard reset, or broad clean.
 
 Build the Template and retain the immutable reference printed by the build:
 
@@ -42,9 +49,11 @@ For the 361-task public comparison, use `validation/validation-contract.example.
 Google mount. A proxy remains required because 45 tasks in that historical inventory declare
 `proxy=true`.
 
-Preflight checks source and inventory identities, runner and model settings, immutable route
-syntax, proxy capability, secret mount constraints, timeout/retry limits, sandbox concurrency, and
-the independent worst-case model request cap. It performs no paid E2B or model work.
+Contract preflight checks source and inventory identities; runner and model settings; immutable
+route syntax; proxy capability; secret mount constraints; timeout/retry limits; sandbox
+concurrency; and the independent worst-case model request cap. It requires no checkout and performs
+no paid E2B or model work. Setup validates the local Python runtime, and actual execution repeats
+that validation before creating a sandbox.
 
 ## Authorize and execute
 
@@ -83,10 +92,10 @@ The checked-in MiniMax lane selects one non-proxy task from each of ten OSWorld 
 the authoritative evaluator rewards with the same tasks from the archived public MiniMax M3 run.
 It is an environment diagnostic, not a full-benchmark score estimate or release parity gate.
 
-Prepare the exact checkout at the lane's current path and use an immutable template reference:
+Prepare the canonical checkout and use an immutable template reference:
 
 ```bash
-runner/setup.sh --profile current-v1 results/OSWorld-current-v1
+runner/setup.sh --profile current-v1
 export FIREWORKS_API_KEY='...'
 
 uv run python runner/minimax_sample.py \
@@ -94,11 +103,9 @@ uv run python runner/minimax_sample.py \
   --num-envs 8
 ```
 
-The current runner must be launched from an environment containing Python 3.12 and Anthropic
-0.84.0. The release-readiness plan replaces this temporary split-path procedure with one pinned
-upstream environment under `runner/OSWorld`; until that work lands, verify those versions before a
-paid run. The runner records runtime provenance and never writes the Fireworks key into retained
-metadata.
+The runner always launches through `runner/OSWorld/.venv/bin/python`. Preflight rejects Python,
+Anthropic, E2B SDK, source, lock, or runner drift before a sandbox is created. The runner records
+that runtime provenance and never writes the Fireworks key into retained metadata.
 
 ## Environment-path smoke validation
 

@@ -6,11 +6,9 @@ from __future__ import annotations
 import argparse
 import asyncio
 import hashlib
-import importlib.metadata
 import json
 import math
 import os
-import platform
 import signal
 import subprocess
 import sys
@@ -19,6 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from runner.campaign import DEFAULT_NUM_ENVS, execute_campaign
+from runner.runtime import inspect_runtime
 
 FIREWORKS_BASE_URL = "https://api.fireworks.ai/inference"
 FIREWORKS_MODEL = "accounts/fireworks/models/minimax-m3"
@@ -102,14 +101,6 @@ def build_comparison(results: dict[tuple[str, str], float], reference: dict) -> 
     }
 
 
-def build_runtime_provenance(python_version: str, anthropic_version: str) -> dict[str, str]:
-    return {
-        "python": python_version,
-        "anthropic": anthropic_version,
-        "transport": "anthropic_messages",
-    }
-
-
 def _run_id() -> str:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     return f"minimax-m3-{timestamp}-{uuid.uuid4().hex[:8]}"
@@ -137,7 +128,8 @@ def main() -> int:
         type=Path,
         default=root / "validation/inventories/current-v1-nogdrive.json",
     )
-    parser.add_argument("--osworld-root", type=Path, default=root / "results/OSWorld-current-v1")
+    parser.add_argument("--osworld-root", type=Path, default=root / "runner" / "OSWorld")
+    parser.add_argument("--python-executable", type=Path, default=None)
     parser.add_argument("--result-root", type=Path, default=root / "results/runs")
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--template", default=None)
@@ -158,6 +150,13 @@ def main() -> int:
         runner = osworld_root / M3_RUNNER
         if not runner.is_file():
             raise ValueError(f"patched M3 runner is missing: {runner}")
+        python_executable = args.python_executable or osworld_root / ".venv" / "bin" / "python"
+        runtime = inspect_runtime(
+            python_executable=python_executable,
+            osworld_root=osworld_root,
+            runner=runner,
+            expected_commit=expected_commit,
+        )
         template = args.template or _default_template(root)
         upstream_args = (
             "--base_url",
@@ -198,6 +197,7 @@ def main() -> int:
             "template": template,
             "model": FIREWORKS_MODEL,
             "num_envs": args.num_envs,
+            "runtime": runtime,
             "fireworks_api_key_available": bool(os.environ.get("FIREWORKS_API_KEY")),
         }
         if args.preflight_only:
@@ -215,9 +215,6 @@ def main() -> int:
             "upstream_args": list(upstream_args),
             "max_attempts": args.max_attempts,
             "task_timeout_seconds": args.task_timeout_seconds,
-            "runtime": build_runtime_provenance(
-                platform.python_version(), importlib.metadata.version("anthropic")
-            ),
         }
         metadata.pop("fireworks_api_key_available")
         run_root = args.result_root / (args.run_id or _run_id())
@@ -225,6 +222,7 @@ def main() -> int:
         for _ in range(args.max_attempts):
             ledger = asyncio.run(
                 execute_campaign(
+                    python_executable=python_executable,
                     run_root=run_root,
                     inventory=sample,
                     metadata=metadata,

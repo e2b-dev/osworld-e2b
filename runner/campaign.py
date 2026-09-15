@@ -25,6 +25,7 @@ from realkit.preflight import (
 )
 from realkit.results import AttemptEvent, RunLedger, TaskKey, catalog_artifacts
 from runner.profile import load_inventory, load_profiles
+from runner.runtime import inspect_runtime
 
 DEFAULT_NUM_ENVS = 8
 TEXT_ARTIFACT_SUFFIXES = {".csv", ".json", ".jsonl", ".log", ".md", ".txt", ".yaml", ".yml"}
@@ -109,6 +110,7 @@ def _redact_text_artifacts(root: Path, sensitive_values: tuple[str, ...]) -> Non
 
 async def execute_campaign(
     *,
+    python_executable: Path,
     run_root: Path,
     inventory: dict,
     metadata: dict,
@@ -124,6 +126,9 @@ async def execute_campaign(
     secret_mounts: tuple[str, ...] | list[str] = (),
     model_endpoints: tuple[str, ...] | list[str] = (),
 ) -> RunLedger:
+    python_executable = Path(os.path.abspath(python_executable))
+    if not python_executable.is_file() or not os.access(python_executable, os.X_OK):
+        raise ValueError(f"python_executable is not executable: {python_executable}")
     template = require_immutable_template_ref(template, "template")
     if num_envs < 1:
         raise ValueError("num_envs must be positive")
@@ -141,7 +146,11 @@ async def execute_campaign(
     tasks = [TaskKey(item["domain"], item["id"]) for item in inventory["tasks"]]
     suite = metadata.get("suite", inventory.get("suite", ""))
     capabilities = validate_capabilities(inventory["tasks"], suite, proxy_config, secret_mounts)
-    metadata = {**metadata, "capabilities": capabilities.to_dict()}
+    metadata = {
+        **metadata,
+        "python_executable": str(python_executable),
+        "capabilities": capabilities.to_dict(),
+    }
     sensitive_values = tuple(
         sorted(
             {
@@ -189,7 +198,7 @@ async def execute_campaign(
             log_root.mkdir()
             _write_json(task_manifest, {task.domain: [task.id]})
             command = [
-                sys.executable,
+                str(python_executable),
                 str(runner),
                 "--provider_name",
                 "e2b",
@@ -333,6 +342,7 @@ def main() -> int:
     parser.add_argument("--contract", type=Path, required=True)
     parser.add_argument("--preflight-only", action="store_true")
     parser.add_argument("--osworld-root", type=Path, default=root / "runner" / "OSWorld")
+    parser.add_argument("--python-executable", type=Path, default=None)
     parser.add_argument("--result-root", type=Path, default=root / "results" / "runs")
     parser.add_argument("--run-id", default=None)
     parser.add_argument("--num-envs", type=int, default=None)
@@ -372,6 +382,15 @@ def main() -> int:
                 ),
             )
             return 0
+        osworld_root = args.osworld_root.resolve()
+        runner = osworld_root / profile["runner"]
+        python_executable = args.python_executable or osworld_root / ".venv" / "bin" / "python"
+        runtime = inspect_runtime(
+            python_executable=python_executable,
+            osworld_root=osworld_root,
+            runner=runner,
+            expected_commit=profile["commit"],
+        )
         execution = contract["execution"]
         sandbox_cap = execution["sandbox_concurrency_cap"]
         num_envs = args.num_envs if args.num_envs is not None else sandbox_cap
@@ -410,7 +429,6 @@ def main() -> int:
         ]
         endpoint_labels = contract["agent"]["endpoint_env"]
         model_endpoints = [os.environ[label] for label in endpoint_labels]
-        runner = args.osworld_root / profile["runner"]
         metadata = {
             "profile": benchmark["profile"],
             "suite": benchmark["suite"],
@@ -421,15 +439,17 @@ def main() -> int:
             "contract_sha256": hashlib.sha256(args.contract.read_bytes()).hexdigest(),
             "endpoint_env": endpoint_labels,
             "upstream_args": upstream_args,
+            "runtime": runtime,
         }
         run_root = args.result_root / (args.run_id or _run_id())
         ledger = asyncio.run(
             execute_campaign(
+                python_executable=python_executable,
                 run_root=run_root,
                 inventory=inventory,
                 metadata=metadata,
                 runner=runner,
-                osworld_root=args.osworld_root,
+                osworld_root=osworld_root,
                 template=contract["route"]["template_ref"],
                 num_envs=num_envs,
                 task_timeout_seconds=execution["task_timeout_seconds"],

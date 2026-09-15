@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from runner.minimax_sample import build_comparison, build_runtime_provenance, build_sample_inventory
+from runner.minimax_sample import build_comparison, build_sample_inventory
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -67,14 +67,6 @@ def test_comparison_reports_task_agreement_and_score_delta() -> None:
     assert comparison["absolute_sample_score_delta"] == 0.5
     assert comparison["task_reward_agreements"] == 1
     assert comparison["tasks"][1]["agrees"] is False
-
-
-def test_runtime_provenance_captures_dependency_identity() -> None:
-    assert build_runtime_provenance("3.13.1", "0.84.0") == {
-        "python": "3.13.1",
-        "anthropic": "0.84.0",
-        "transport": "anthropic_messages",
-    }
 
 
 def test_retained_diagnostic_receipt_is_internally_consistent() -> None:

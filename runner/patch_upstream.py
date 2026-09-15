@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -172,16 +173,7 @@ def _is_owned_untracked(path: str) -> bool:
     return path in OWNED_UNTRACKED_FILES or path.startswith(OWNED_UNTRACKED_PREFIXES)
 
 
-def patch_checkout(root: Path, expected_commit: str) -> None:
-    root = root.resolve()
-    if not (root / ".git").exists():
-        raise RuntimeError(f"not a Git checkout: {root}")
-    actual_commit = git(root, "rev-parse", "HEAD")
-    if actual_commit != expected_commit:
-        raise RuntimeError(
-            f"OSWorld commit mismatch: expected {expected_commit}, got {actual_commit}"
-        )
-
+def _reject_unexpected_changes(root: Path) -> None:
     changed = set(filter(None, git(root, "diff", "--name-only", "HEAD").splitlines()))
     untracked = set(
         filter(None, git(root, "ls-files", "--others", "--exclude-standard").splitlines())
@@ -192,6 +184,57 @@ def patch_checkout(root: Path, expected_commit: str) -> None:
     )
     if unexpected:
         raise RuntimeError(f"unexpected checkout changes: {', '.join(unexpected)}")
+
+
+def restore_owned_patch(root: Path) -> None:
+    """Restore only the files generated or copied by this adapter."""
+    root = root.resolve()
+    if not (root / ".git").exists():
+        raise RuntimeError(f"not a Git checkout: {root}")
+    _reject_unexpected_changes(root)
+    for relative in OWNED_TRACKED_PATHS:
+        pristine = subprocess.check_output(["git", "-C", str(root), "show", f"HEAD:{relative}"])
+        (root / relative).write_bytes(pristine)
+    for relative in OWNED_UNTRACKED_FILES:
+        path = root / relative
+        if path.exists():
+            path.unlink()
+    for prefix in OWNED_UNTRACKED_PREFIXES:
+        path = root / prefix
+        if path.exists():
+            if git(root, "ls-files", "--", prefix):
+                raise RuntimeError(f"refusing to remove tracked adapter path: {prefix}")
+            shutil.rmtree(path)
+
+
+def verify_patched_checkout(root: Path, expected_commit: str) -> None:
+    """Require every transformed tracked file to match the generated adapter."""
+    root = root.resolve()
+    if not (root / ".git").exists():
+        raise RuntimeError(f"not a Git checkout: {root}")
+    actual_commit = git(root, "rev-parse", "HEAD")
+    if actual_commit != expected_commit:
+        raise RuntimeError(
+            f"OSWorld commit mismatch: expected {expected_commit}, got {actual_commit}"
+        )
+    _reject_unexpected_changes(root)
+    for relative, transform in TRANSFORMS.items():
+        expected = transform(git_show(root, relative))
+        if (root / relative).read_text() != expected:
+            raise RuntimeError(f"generated adapter drift: {relative}")
+
+
+def patch_checkout(root: Path, expected_commit: str) -> None:
+    root = root.resolve()
+    if not (root / ".git").exists():
+        raise RuntimeError(f"not a Git checkout: {root}")
+    actual_commit = git(root, "rev-parse", "HEAD")
+    if actual_commit != expected_commit:
+        raise RuntimeError(
+            f"OSWorld commit mismatch: expected {expected_commit}, got {actual_commit}"
+        )
+
+    _reject_unexpected_changes(root)
 
     outputs: dict[str, str] = {}
     for relative, transform in TRANSFORMS.items():
@@ -209,14 +252,22 @@ def patch_checkout(root: Path, expected_commit: str) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("checkout", type=Path)
-    parser.add_argument("--expected-commit", required=True)
+    operation = parser.add_mutually_exclusive_group(required=True)
+    operation.add_argument("--expected-commit")
+    operation.add_argument("--restore-owned", action="store_true")
     args = parser.parse_args()
     try:
-        patch_checkout(args.checkout, args.expected_commit)
+        if args.restore_owned:
+            restore_owned_patch(args.checkout)
+        else:
+            patch_checkout(args.checkout, args.expected_commit)
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
         print(f"ERROR: {error}", file=sys.stderr)
         return 1
-    print(f"OSWorld adapter patch verified at {args.expected_commit}")
+    if args.restore_owned:
+        print("OSWorld adapter-owned patch restored")
+    else:
+        print(f"OSWorld adapter patch verified at {args.expected_commit}")
     return 0
 
 

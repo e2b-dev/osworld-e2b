@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -165,3 +166,64 @@ def test_upstream_patcher_rejects_unowned_tracked_changes(tmp_path: Path) -> Non
 
     assert result.returncode == 1
     assert "unexpected checkout changes" in result.stderr
+
+
+def test_restore_owned_patch_returns_checkout_to_pristine_head(tmp_path: Path) -> None:
+    from runner.patch_upstream import restore_owned_patch
+
+    checkout, head = _checkout(tmp_path)
+    result = _run("python3", str(PATCHER), str(checkout), "--expected-commit", head)
+    assert result.returncode == 0, result.stdout + result.stderr
+    source = ROOT / "realkit"
+    destination = checkout / "desktop_env" / "providers" / "e2b"
+    destination.mkdir()
+    shutil.copy(source / "provider.py", destination / "provider.py")
+    (checkout / "e2b_relay.py").write_text("generated\n")
+
+    restore_owned_patch(checkout)
+
+    assert _run("git", "diff", "--exit-code", "HEAD", cwd=checkout).returncode == 0
+    assert not destination.exists()
+    assert not (checkout / "e2b_relay.py").exists()
+
+
+def test_owned_restore_allows_bidirectional_git_profile_switches(tmp_path: Path) -> None:
+    from runner.patch_upstream import patch_checkout, restore_owned_patch
+
+    checkout, first_commit = _checkout(tmp_path)
+    desktop_env = checkout / "desktop_env" / "desktop_env.py"
+    desktop_env.write_text(desktop_env.read_text().replace('"modal"', '"daytona"'))
+    (checkout / "profile-marker.txt").write_text("second\n")
+    _run("git", "add", "desktop_env/desktop_env.py", "profile-marker.txt", cwd=checkout)
+    _run("git", "commit", "-qm", "second profile", cwd=checkout)
+    second_commit = _run("git", "rev-parse", "HEAD", cwd=checkout).stdout.strip()
+    _run("git", "checkout", "--detach", "--quiet", first_commit, cwd=checkout)
+    patch_checkout(checkout, first_commit)
+    destination = checkout / "desktop_env" / "providers" / "e2b"
+    destination.mkdir()
+    shutil.copy(ROOT / "realkit" / "provider.py", destination / "provider.py")
+
+    blocked = _run("git", "checkout", "--detach", "--quiet", second_commit, cwd=checkout)
+    assert blocked.returncode != 0
+
+    restore_owned_patch(checkout)
+    assert (
+        _run("git", "checkout", "--detach", "--quiet", second_commit, cwd=checkout).returncode == 0
+    )
+    patch_checkout(checkout, second_commit)
+    restore_owned_patch(checkout)
+    assert (
+        _run("git", "checkout", "--detach", "--quiet", first_commit, cwd=checkout).returncode == 0
+    )
+
+
+def test_patch_verifier_rejects_adapter_owned_source_drift(tmp_path: Path) -> None:
+    from runner.patch_upstream import patch_checkout, verify_patched_checkout
+
+    checkout, head = _checkout(tmp_path)
+    patch_checkout(checkout, head)
+    runner = checkout / "scripts" / "python" / "run_multienv_m3.py"
+    runner.write_text(runner.read_text() + "# local mutation\n")
+
+    with pytest.raises(RuntimeError, match="generated adapter drift"):
+        verify_patched_checkout(checkout, head)
