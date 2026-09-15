@@ -1,0 +1,8 @@
+{
+  "name": "osworld-e2b-proxy-required-diagnostic",
+  "description": "A proxy-required environment-path diagnostic. Supply a real runtime proxy configuration; this is not a benchmark score lane.",
+  "osworld_commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+  "tasks": [
+    {"domain": "chrome", "id": "06fe7178-4491-4589-810f-2e2bc9502122", "requires_proxy": true}
+  ]
+}

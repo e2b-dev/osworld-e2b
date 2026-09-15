@@ -1,0 +1,20 @@
+# OSWorld guest-server python deps, Linux/x86 subset.
+# Differs from upstream desktop_env/server/requirements.txt:
+#   - Xlib comes from apt (python3-xlib)
+#   - pynput uses a released x86-compatible version, not the Apple-Silicon PR
+#   - pywinauto dropped: Windows-only (pulls pywin32/comtypes, uninstallable on Linux)
+#   - pyatspi comes from apt (python3-pyatspi), not pip
+PyAutoGUI==0.9.54
+Pillow==12.3.0
+# pynput's Linux backend imports evdev. Pin the exact release selected by the
+# verified build instead of letting pip backtrack across incompatible releases.
+evdev==1.6.1
+pynput==1.8.1
+requests==2.33.0
+Flask==3.1.3
+numpy==1.26.4
+lxml==6.1.0
+pygame==2.6.1
+# aiohttp: guest-side CDP host-normalizing proxy (cdp_hostfix.py), which the
+# /usr/local/bin/socat shim substitutes for the 9222->1337 forward.
+aiohttp==3.14.3

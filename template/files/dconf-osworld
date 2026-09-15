@@ -1,0 +1,14 @@
+[org/gnome/desktop/interface]
+toolkit-accessibility=true
+cursor-theme='Adwaita'
+icon-theme='Adwaita'
+gtk-theme='Adwaita'
+font-name='Ubuntu 11'
+text-scaling-factor=1.0
+scaling-factor=uint32 1
+
+[org/gnome/desktop/wm/preferences]
+num-workspaces=1
+
+[org/gnome/mutter]
+dynamic-workspaces=false

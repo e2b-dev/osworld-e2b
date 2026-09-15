@@ -1,0 +1,7 @@
+{
+  "repository": "https://github.com/xlang-ai/OSWorld.git",
+  "commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+  "profile": "current-v1",
+  "profiles": "validation/profiles.json",
+  "license": "Apache-2.0"
+}

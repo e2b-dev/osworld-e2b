@@ -1,0 +1,60 @@
+{
+  "commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+  "evaluator_tree_sha256": "5de1b59c6ce7fab8fc78dde223a4574ac2ce084bc6599459a024ce6d1bad7465",
+  "inventory_sha256": "8fa078095c754be7f33e0aea55575be5bbf0bd0cf78b937c213eb13e2f475eb8",
+  "profile": "current-v1",
+  "repository": "https://github.com/xlang-ai/OSWorld.git",
+  "schema_version": 1,
+  "suite": "gdrive",
+  "task_count": 8,
+  "tasks": [
+    {
+      "domain": "multi_apps",
+      "id": "46407397-a7d5-4c6b-92c6-dbe038b1457b",
+      "proxy": true,
+      "task_sha256": "ee66690f64c167267fffd5948a665ac87934c7fed5e83cfb659e971eedbc766c"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "4e9f0faf-2ecc-4ae8-a804-28c9a75d1ddc",
+      "proxy": true,
+      "task_sha256": "15be01d3fbb9f2660d36466f0eb3f88589a1cf687fb9281eaf0d61c8c7a611ff"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "78aed49a-a710-4321-a793-b611a7c5b56b",
+      "proxy": true,
+      "task_sha256": "5329a340d74196cab63c9f59840950d06cb9b3a2be11afd2a22b3198c7806c2b"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "897e3b53-5d4d-444b-85cb-2cdc8a97d903",
+      "proxy": true,
+      "task_sha256": "badad00d2b6d7942ec415d35783a3792f8a5446ad85577161fbe0cefd53502eb"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "a0b9dc9c-fc07-4a88-8c5d-5e3ecad91bcb",
+      "proxy": true,
+      "task_sha256": "e02d7d493810ceaeb8b412776c66e29c6b1752bd8f9a9bf05c5a66a680feb049"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "b52b40a5-ad70-4c53-b5b0-5650a8387052",
+      "proxy": true,
+      "task_sha256": "517fa5115887a8e4419e65bb2b3d418d1de1fdbfb44c13bb00046f9d57c14cb7"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "0c825995-5b70-4526-b663-113f4c999dd2",
+      "proxy": false,
+      "task_sha256": "2000667ae17954a764b61d2ac19e1f77d7c1347114125494753ef0a35a7f6a77"
+    },
+    {
+      "domain": "multi_apps",
+      "id": "22a4636f-8179-4357-8e87-d1743ece1f81",
+      "proxy": true,
+      "task_sha256": "95bf58b856e1f8e28a124a9ab60ba1bb6f369a626694f2dbca5421b8e02e6637"
+    }
+  ]
+}

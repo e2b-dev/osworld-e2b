@@ -1,0 +1,8 @@
+[
+  {
+    "host": "proxy.invalid",
+    "password": "fixture-pass",
+    "port": 8080,
+    "username": "fixture-user"
+  }
+]

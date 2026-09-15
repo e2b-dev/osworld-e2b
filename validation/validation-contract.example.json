@@ -1,0 +1,53 @@
+{
+  "agent": {
+    "endpoint_env": [
+      "QWEN_ENDPOINT_0"
+    ],
+    "model": "Qwen3-VL-8B-Thinking",
+    "model_commit": "3e6acbe78847870fc645786bfaf55c64bff84903",
+    "model_repository": "UI-MOPD/Qwen3-VL-8B-Thinking-UI-MOPD-Student",
+    "settings": {
+      "action_space": "pyautogui",
+      "coordinate_type": "relative",
+      "max_steps": 50,
+      "max_tokens": 2048,
+      "max_trajectory_length": 3,
+      "observation_type": "screenshot",
+      "screen_height": 1080,
+      "screen_width": 1920,
+      "sleep_after_execution": 3,
+      "temperature": 0,
+      "top_p": 0.9
+    }
+  },
+  "benchmark": {
+    "commit": "fe8c78e15a1149e82d54137e9ffef18aee710ed7",
+    "inventory_sha256": "e4df86d07489d72503192c3d276a0569a5ee02f16ce8c644d7622e04c518081e",
+    "profile": "ui-mopd-qwen3vl-docker",
+    "repository": "https://github.com/xlang-ai/OSWorld.git",
+    "suite": "nogdrive",
+    "task_count": 361
+  },
+  "comparison": {
+    "mode": "public_docker_parity",
+    "absolute_score_delta_lte": 0.03,
+    "reference_dataset_commit": "a518b8776c172c9456f85b3fa5ef451d326a7969",
+    "reference_score": 0.36784545558256826,
+    "reference_scored_tasks": 359,
+    "reference_total_tasks": 361
+  },
+  "execution": {
+    "execution_authorized": false,
+    "max_attempts_per_task": 2,
+    "model_call_attempts": 5,
+    "model_request_cap": 180500,
+    "sandbox_concurrency_cap": 8,
+    "task_timeout_seconds": 1800
+  },
+  "route": {
+    "final": false,
+    "runner": "scripts/python/run_multienv_qwen3vl.py",
+    "template_ref": "osworld-gnome-example:00000000-0000-0000-0000-000000000001"
+  },
+  "schema_version": 1
+}

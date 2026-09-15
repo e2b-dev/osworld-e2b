@@ -1,0 +1,43 @@
+{
+  "default_profile": "current-v1",
+  "profiles": {
+    "current-v1": {
+      "commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+      "repository": "https://github.com/xlang-ai/OSWorld.git",
+      "runner": "scripts/python/run_multienv_qwen3vl.py",
+      "source_commit_provenance": "verified_official_upstream",
+      "suites": {
+        "all": {
+          "inventory": "validation/inventories/current-v1-all.json",
+          "upstream_manifest": "evaluation_examples/test_all.json"
+        },
+        "gdrive": {
+          "difference_from": "nogdrive",
+          "inventory": "validation/inventories/current-v1-gdrive.json",
+          "upstream_manifest": "evaluation_examples/test_all.json"
+        },
+        "nogdrive": {
+          "inventory": "validation/inventories/current-v1-nogdrive.json",
+          "upstream_manifest": "evaluation_examples/test_nogdrive.json"
+        }
+      }
+    },
+    "ui-mopd-qwen3vl-docker": {
+      "commit": "fe8c78e15a1149e82d54137e9ffef18aee710ed7",
+      "reference": {
+        "dataset_commit": "a518b8776c172c9456f85b3fa5ef451d326a7969",
+        "model_commit": "3e6acbe78847870fc645786bfaf55c64bff84903"
+      },
+      "repository": "https://github.com/xlang-ai/OSWorld.git",
+      "runner": "scripts/python/run_multienv_qwen3vl.py",
+      "source_commit_provenance": "inferred_from_run_date",
+      "suites": {
+        "nogdrive": {
+          "inventory": "validation/inventories/ui-mopd-qwen3vl-docker-nogdrive.json",
+          "upstream_manifest": "evaluation_examples/test_nogdrive.json"
+        }
+      }
+    }
+  },
+  "schema_version": 1
+}
