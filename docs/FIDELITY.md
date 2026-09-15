@@ -61,6 +61,27 @@ all earlier evidence.
 transport only. It is not an agent task pass. A benchmark score requires a complete authoritative
 agent campaign.
 
+## Measured diagnostic result
+
+A ten-task MiniMax M3 run on the `current-v1` no-Google-Drive inventory exercised one non-proxy task
+from each of ten domains. All ten tasks produced valid evaluator outputs while reaching eight
+concurrent children. The run recorded 20 sandbox creates and 20 cleans with no cleanup failure,
+729 content-bearing model responses with no model error or retry, 1,648 artifact entries with no
+checksum error, 739 screenshots, and ten recordings. A byte scan found no Fireworks API key in the
+retained files.
+
+The E2B score was `0.20`; the same selected tasks scored `0.80` in the archived public result, and
+two of ten task rewards agreed. Visual inspection found a material initial-state difference: the
+public Chrome and GIMP windows were maximized with the dock visible, while the E2B windows were
+smaller or half-width and the dock was hidden. This is actionable fidelity evidence, not proof that
+window geometry explains the complete score delta.
+
+The public run used AWS and adaptive thinking, while the E2B run used Fireworks without adaptive
+thinking. The public result also does not authenticate an OSWorld source commit. Consequently this
+sample neither isolates the environment provider nor estimates the complete benchmark score. Its
+sanitized identities and counts are retained in
+`validation/evidence/minimax-m3-e2b-diverse-10.json`; raw trajectories remain in ignored storage.
+
 ## Docker parity boundary
 
 The public comparison is UI-MOPD's Qwen3-VL Docker result at dataset commit

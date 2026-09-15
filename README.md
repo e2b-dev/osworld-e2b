@@ -39,9 +39,27 @@ timeouts, crashes, missing or malformed output, identity drift, failed cleanup, 
 Re-running the same contract with the same `--run-id` resumes eligible tasks without deleting old
 attempts.
 
+## Current validation boundary
+
+The integration is implemented but is not yet fidelity-validated or release-ready. A ten-task
+MiniMax M3 diagnostic completed with ten valid evaluator results, eight concurrent children, 729
+successful model responses, complete artifact checksums, and complete sandbox cleanup. It scored
+`0.20` against `0.80` for the same selected tasks in the public result, with reward agreement on
+two of ten tasks. The public run used AWS and adaptive thinking, while the diagnostic used
+Fireworks without adaptive thinking, so the difference is evidence for investigation rather than
+a provider-controlled parity measurement.
+
+The sanitized [diagnostic receipt](validation/evidence/minimax-m3-e2b-diverse-10.json) records the
+identities and counts. The [release-readiness plan](docs/superpowers/plans/2026-09-14-osworld-v1-release-readiness.md)
+defines the remaining reproducibility, desktop-fidelity, capability, lifecycle, and full-suite
+comparison gates. A locked Python 3.12 OSWorld runtime and safe profile switching are required
+before merge; the complete fidelity and parity gates remain required before describing this port
+as validated.
+
 ## Build and offline verification
 
-Python 3.11+, Node.js 20+, `uv`, and npm are required.
+The repository tooling supports Python 3.11+, while the current upstream OSWorld checkout requires
+Python 3.12. Node.js 20+, `uv`, and npm are also required.
 
 ```bash
 uv sync --locked --all-groups

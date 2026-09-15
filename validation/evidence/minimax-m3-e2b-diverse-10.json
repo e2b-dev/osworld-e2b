@@ -1,0 +1,74 @@
+{
+  "schema_version": 1,
+  "classification": "diagnostic_sample_not_release_parity",
+  "run_id": "minimax-m3-diverse-10-sdk084",
+  "source": {
+    "repository": "https://github.com/xlang-ai/OSWorld.git",
+    "osworld_commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+    "profile": "current-v1",
+    "suite": "nogdrive"
+  },
+  "e2b": {
+    "template": "osworld-gnome-00dd86f0fd232b9a:51bf9f35-99ef-46c7-ba39-e776745a1ab3",
+    "python": "3.11.15",
+    "anthropic": "0.84.0",
+    "configured_sandbox_concurrency": 8,
+    "max_observed_children": 8,
+    "task_count": 10,
+    "valid_tasks": 10,
+    "reward_sum": 2.0,
+    "score": 0.2,
+    "sandbox_creates": 20,
+    "sandbox_cleans": 20,
+    "sandbox_cleanup_failures": 0,
+    "model_call_records": 729,
+    "model_call_content_responses": 729,
+    "model_call_errors": 0,
+    "model_retry_records": 0,
+    "artifact_catalog_entries": 1648,
+    "artifact_checksum_errors": 0,
+    "screenshots": 739,
+    "recordings": 10,
+    "fireworks_api_key_byte_hits": 0
+  },
+  "public_reference": {
+    "model": "MiniMax M3",
+    "environment_provider": "aws",
+    "leaderboard": "https://osworld-v1.xlang.ai/",
+    "trajectory_archive": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_verified_trajs/blob/main/results_full361_adaptive_20260609_094019_minimax_m3.zip",
+    "trajectory_result_sha256": "d1377402d2be1bff765c4a6f5279d6920bd983add6022e3bf5ff31e5c0db37bf",
+    "full_task_count": 358,
+    "full_reward_sum": 269.182520877595,
+    "full_score": 0.75190648289831,
+    "selected_task_count": 10,
+    "selected_reward_sum": 8.0,
+    "selected_score": 0.8
+  },
+  "comparison": {
+    "absolute_sample_score_delta": 0.6000000000000001,
+    "task_reward_agreements": 2,
+    "task_reward_agreement_rate": 0.2
+  },
+  "protocol": {
+    "model_endpoint": "accounts/fireworks/models/minimax-m3",
+    "observation_type": "screenshot",
+    "action_space": "pyautogui",
+    "coordinate_type": "relative",
+    "screen_width": 1920,
+    "screen_height": 1080,
+    "max_steps": 100,
+    "max_tokens": 8192,
+    "max_trajectory_length": 10,
+    "temperature": 1.0,
+    "top_p": null,
+    "sleep_after_execution_seconds": 3.0,
+    "thinking_mode": null
+  },
+  "limitations": [
+    "The sample contains one non-proxy task from each of ten OSWorld domains and does not exercise proxy or Google Drive credentials.",
+    "The public run used AWS and adaptive thinking; the E2B run used Fireworks without adaptive thinking.",
+    "The public result does not authenticate its OSWorld source commit, while the E2B run uses the current-v1 commit recorded above.",
+    "The score difference is diagnostic evidence and does not establish environment parity or estimate the complete benchmark score.",
+    "Raw trajectories and visual artifacts remain in ignored local storage and are not part of the public repository."
+  ]
+}

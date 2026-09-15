@@ -27,6 +27,7 @@ from realkit.results import AttemptEvent, RunLedger, TaskKey, catalog_artifacts
 from runner.profile import load_inventory, load_profiles
 
 DEFAULT_NUM_ENVS = 8
+TEXT_ARTIFACT_SUFFIXES = {".csv", ".json", ".jsonl", ".log", ".md", ".txt", ".yaml", ".yml"}
 PROTECTED_ARGUMENTS = {
     "--provider_name",
     "--path_to_vm",
@@ -93,8 +94,10 @@ def _parse_reward(result_root: Path) -> tuple[float | None, str | None]:
     return reward, None
 
 
-def _redact_logs(root: Path, sensitive_values: tuple[str, ...]) -> None:
-    for path in root.rglob("*.log"):
+def _redact_text_artifacts(root: Path, sensitive_values: tuple[str, ...]) -> None:
+    for path in root.rglob("*"):
+        if not path.is_file() or path.suffix.lower() not in TEXT_ARTIFACT_SUFFIXES:
+            continue
         try:
             text = path.read_text()
         except (OSError, UnicodeDecodeError):
@@ -143,7 +146,9 @@ async def execute_campaign(
         sorted(
             {
                 *collect_redaction_values(proxy_config, secret_mounts),
-                *collect_environment_redaction_values(os.environ, model_endpoints),
+                *collect_environment_redaction_values(
+                    {**os.environ, **(child_environment or {})}, model_endpoints
+                ),
             },
             key=len,
             reverse=True,
@@ -208,6 +213,10 @@ async def execute_campaign(
                 "E2B_RELAY_PATH": str(osworld_root / "e2b_relay.py"),
                 "OSWORLD_LOG_DIR": str(log_root),
             }
+            inherited_pythonpath = environment.get("PYTHONPATH")
+            environment["PYTHONPATH"] = str(osworld_root) + (
+                os.pathsep + inherited_pythonpath if inherited_pythonpath else ""
+            )
             if proxy_config is not None:
                 environment["PROXY_CONFIG_FILE"] = str(Path(proxy_config).resolve())
             if model_endpoints:
@@ -243,7 +252,7 @@ async def execute_campaign(
                     async with counter_lock:
                         active_children -= 1
 
-            _redact_logs(attempt_dir, sensitive_values)
+            _redact_text_artifacts(attempt_dir, sensitive_values)
             cleanup = _cleanup_status(attempt_dir / "relay-events.jsonl")
             reward, result_error = _parse_reward(result_root)
             artifacts = catalog_artifacts(attempt_dir)

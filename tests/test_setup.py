@@ -53,6 +53,17 @@ def _checkout(
         "            model=args.model,\n"
         ")\n\n\n"
     )
+    (scripts / "run_multienv_m3.py").write_text(
+        'LOG = os.path.join("logs", "normal.log")\n'
+        'os.makedirs("logs", exist_ok=True)\n'
+        '    parser.add_argument("--path_to_vm", type=str, default=None)\n'
+        'parser.add_argument("--provider_name", choices=["docker", "daytona"])\n'
+        "        env_kwargs = dict(\n"
+        "            client_password=client_password,\n"
+        "            enable_proxy=args.enable_proxy,\n"
+        "        )\n"
+        "        env = DesktopEnv(**env_kwargs)\n"
+    )
     agents = checkout / "mm_agents"
     agents.mkdir()
     (agents / "qwen3vl_agent.py").write_text(
@@ -80,12 +91,18 @@ def test_upstream_patcher_is_deterministic_and_idempotent(tmp_path: Path) -> Non
     assert 'self.provider_name == "e2b"' in (checkout / "desktop_env/desktop_env.py").read_text()
     generic = (checkout / "scripts/python/run_multienv.py").read_text()
     qwen = (checkout / "scripts/python/run_multienv_qwen3vl.py").read_text()
+    m3 = (checkout / "scripts/python/run_multienv_m3.py").read_text()
     assert '"e2b"' in generic
     assert "OSWORLD_LOG_DIR" in generic
     assert 'parser.add_argument("--api_backend", choices=["openai", "dashscope"]' in qwen
     assert "api_backend=args.api_backend" in qwen
     assert 'parser.add_argument("--vm_secret_mount"' in qwen
     assert "vm_secret_mounts=args.vm_secret_mount" in qwen
+    assert '"e2b"' in m3
+    assert "OSWORLD_LOG_DIR" in m3
+    assert 'os.makedirs(os.environ.get("OSWORLD_LOG_DIR", "logs"), exist_ok=True)' in m3
+    assert 'parser.add_argument("--vm_secret_mount"' in m3
+    assert "vm_secret_mounts=args.vm_secret_mount" in m3
 
 
 @pytest.mark.parametrize(

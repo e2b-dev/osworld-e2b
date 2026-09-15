@@ -1,0 +1,106 @@
+{
+  "schema_version": 1,
+  "model": {
+    "name": "MiniMax M3",
+    "fireworks_model": "accounts/fireworks/models/minimax-m3"
+  },
+  "public_run": {
+    "date": "2026-06-08",
+    "environment_provider": "aws",
+    "leaderboard_source": "https://osworld-v1.xlang.ai/",
+    "trajectory_archive": "https://huggingface.co/datasets/xlangai/ubuntu_osworld_verified_trajs/blob/main/results_full361_adaptive_20260609_094019_minimax_m3.zip",
+    "trajectory_result_path": "results_full361_adaptive_20260609_094019/pyautogui/screenshot/MiniMax-M3/all_result.json",
+    "trajectory_result_sha256": "d1377402d2be1bff765c4a6f5279d6920bd983add6022e3bf5ff31e5c0db37bf",
+    "task_count": 358,
+    "reward_sum": 269.182520877595,
+    "score": 0.75190648289831,
+    "settings": {
+      "action_space": "pyautogui",
+      "coordinate_type": "relative",
+      "max_steps": 100,
+      "max_tokens": 8192,
+      "max_trajectory_length": 10,
+      "observation_type": "screenshot",
+      "screen_height": 1080,
+      "screen_width": 1920,
+      "sleep_after_execution": 3.0,
+      "temperature": 1.0,
+      "top_p": null
+    }
+  },
+  "reproduction": {
+    "environment_provider": "e2b",
+    "osworld_commit": "fc31a9049664292fcb35d6e501ee1dc839f2cf6d",
+    "profile": "current-v1",
+    "suite": "nogdrive",
+    "thinking_mode": null
+  },
+  "sample": {
+    "selection": "One non-proxy task from every OSWorld domain, spanning state, file, media, document, multi-app, and infeasible-evaluator paths. Public rewards include eight successes and two failures.",
+    "task_count": 10,
+    "reward_sum": 8.0,
+    "score": 0.8,
+    "tasks": [
+      {
+        "domain": "chrome",
+        "id": "2ad9387a-65d8-4e33-ad5b-7580065a27ca",
+        "published_reward": 1.0,
+        "task_sha256": "4ddb526e5f3b9efa72a01e3ccae86ee4d698f480e4a526f9dfde85fd9499559c"
+      },
+      {
+        "domain": "gimp",
+        "id": "554785e9-4523-4e7a-b8e1-8016f565f56a",
+        "published_reward": 1.0,
+        "task_sha256": "b1a1031a95a4240a6979eb5aa8a8012cf9cb2a2c2864c63fb4d76e2bfc46c5d7"
+      },
+      {
+        "domain": "libreoffice_calc",
+        "id": "357ef137-7eeb-4c80-a3bb-0951f26a8aff",
+        "published_reward": 1.0,
+        "task_sha256": "c7cb07720392d1fd5da5aa323e989d8e9d772de02b8317b0f05370d6ab896511"
+      },
+      {
+        "domain": "libreoffice_impress",
+        "id": "08aced46-45a2-48d7-993b-ed3fb5b32302",
+        "published_reward": 1.0,
+        "task_sha256": "ed01cef07e1c1a000326b245f8aba48cf6f02918c648e78aaeafb223e1e307c2"
+      },
+      {
+        "domain": "libreoffice_writer",
+        "id": "0810415c-bde4-4443-9047-d5f70165a697",
+        "published_reward": 1.0,
+        "task_sha256": "25b48b75bbe896e3b50f5304c831ff8c768ddf6057c4cca2f1901ba1ad6a4e3d"
+      },
+      {
+        "domain": "multi_apps",
+        "id": "c867c42d-a52d-4a24-8ae3-f75d256b5618",
+        "published_reward": 1.0,
+        "task_sha256": "db6057fcb01dfd5f75d8acdce24fe89a6e2a9464d9a9f23c0558c2e328a01ee6"
+      },
+      {
+        "domain": "os",
+        "id": "28cc3b7e-b194-4bc9-8353-d04c0f4d56d2",
+        "published_reward": 1.0,
+        "task_sha256": "9cd774213b8e1aa154c4cff008b4e38ca011f6bc900e48355ee14585adef8c26"
+      },
+      {
+        "domain": "thunderbird",
+        "id": "9b7bc335-06b5-4cd3-9119-1a649c478509",
+        "published_reward": 1.0,
+        "task_sha256": "66c6e5e35b8453a1e813f81d58348d51f9b490f9f10abbddd59da78040669762"
+      },
+      {
+        "domain": "vlc",
+        "id": "aa4b5023-aef6-4ed9-bdc9-705f59ab9ad6",
+        "published_reward": 0.0,
+        "task_sha256": "e6e724a40ebc25e003cbe34747d9ce6f08dd0fd9847de613870cf4bd2a4e7ad7"
+      },
+      {
+        "domain": "vs_code",
+        "id": "dcbe20e8-647f-4f1d-8696-f1c5bbb570e3",
+        "published_reward": 0.0,
+        "task_sha256": "e92d5d25dede67c6acd41f0b6b2342ff51c102806de6298727e6efc1cda4fadf"
+      }
+    ]
+  }
+}

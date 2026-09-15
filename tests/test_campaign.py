@@ -238,3 +238,55 @@ async def test_campaign_injects_but_does_not_retain_secret_source_path_or_bytes(
     assert "secret-private-key" not in retained
     assert "google-service-account.json" in retained
     assert "/opt/osworld/secrets/google.json" in retained
+
+
+@pytest.mark.asyncio
+async def test_campaign_redacts_secrets_supplied_in_child_environment(tmp_path: Path) -> None:
+    secret = "fireworks-secret-value"
+    ledger = await execute_campaign(
+        run_root=tmp_path / "run",
+        inventory=_inventory(["task-a"]),
+        metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
+        runner=FAKE_RUNNER,
+        osworld_root=tmp_path,
+        template=TEMPLATE,
+        num_envs=1,
+        task_timeout_seconds=2,
+        max_attempts=1,
+        child_environment={
+            "ANTHROPIC_API_KEY": secret,
+            "FAKE_ECHO_ENV": "1",
+            "FAKE_WRITE_SECRET_ARTIFACT": "1",
+        },
+    )
+    stdout = (ledger.root / "attempts" / "chrome" / "task-a" / "1" / "stdout.log").read_text()
+
+    assert secret not in stdout
+    assert "<redacted>" in stdout
+    args_snapshot = next(ledger.root.rglob("args.json")).read_text()
+    assert secret not in args_snapshot
+    assert "<redacted>" in args_snapshot
+
+
+@pytest.mark.asyncio
+async def test_campaign_adds_osworld_root_to_child_pythonpath(tmp_path: Path) -> None:
+    osworld_root = tmp_path / "OSWorld"
+    osworld_root.mkdir()
+    ledger = await execute_campaign(
+        run_root=tmp_path / "run",
+        inventory=_inventory(["task-a"]),
+        metadata={"profile": "fixture", "suite": "nogdrive", "template": TEMPLATE},
+        runner=FAKE_RUNNER,
+        osworld_root=osworld_root,
+        template=TEMPLATE,
+        num_envs=1,
+        task_timeout_seconds=2,
+        max_attempts=1,
+        child_environment={
+            "FAKE_ECHO_PYTHONPATH": "1",
+            "PYTHONPATH": "/existing/pythonpath",
+        },
+    )
+    stdout = (ledger.root / "attempts" / "chrome" / "task-a" / "1" / "stdout.log").read_text()
+
+    assert f"PYTHONPATH {osworld_root}:/existing/pythonpath" in stdout

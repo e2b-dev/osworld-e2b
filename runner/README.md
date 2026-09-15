@@ -77,6 +77,29 @@ Every scheduled attempt is represented in `results/runs/<run-id>/attempts.jsonl`
 directories retain all produced upstream artifacts and checksum catalogs. `aggregate.json` is
 updated atomically and separates valid zeros from infrastructure-invalid outcomes.
 
+## MiniMax M3 diagnostic sample
+
+The checked-in MiniMax lane selects one non-proxy task from each of ten OSWorld domains and compares
+the authoritative evaluator rewards with the same tasks from the archived public MiniMax M3 run.
+It is an environment diagnostic, not a full-benchmark score estimate or release parity gate.
+
+Prepare the exact checkout at the lane's current path and use an immutable template reference:
+
+```bash
+runner/setup.sh --profile current-v1 results/OSWorld-current-v1
+export FIREWORKS_API_KEY='...'
+
+uv run python runner/minimax_sample.py \
+  --template 'osworld-gnome-<digest>:<build-id>' \
+  --num-envs 8
+```
+
+The current runner must be launched from an environment containing Python 3.12 and Anthropic
+0.84.0. The release-readiness plan replaces this temporary split-path procedure with one pinned
+upstream environment under `runner/OSWorld`; until that work lands, verify those versions before a
+paid run. The runner records runtime provenance and never writes the Fireworks key into retained
+metadata.
+
 ## Environment-path smoke validation
 
 ```bash

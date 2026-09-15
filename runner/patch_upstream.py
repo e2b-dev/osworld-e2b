@@ -14,6 +14,7 @@ OWNED_TRACKED_PATHS = {
     "desktop_env/providers/__init__.py",
     "mm_agents/qwen3vl_agent.py",
     "scripts/python/run_multienv.py",
+    "scripts/python/run_multienv_m3.py",
     "scripts/python/run_multienv_qwen3vl.py",
 }
 OWNED_UNTRACKED_PREFIXES = ("desktop_env/providers/e2b/",)
@@ -82,6 +83,10 @@ def _runner(source: str) -> str:
         source = (
             source[: match.start("body")] + body + comma + ' "e2b"' + source[match.end("body") :]
         )
+    source = source.replace(
+        'os.makedirs("logs", exist_ok=True)',
+        'os.makedirs(os.environ.get("OSWORLD_LOG_DIR", "logs"), exist_ok=True)',
+    )
     return source.replace(
         'os.path.join("logs",',
         'os.path.join(os.environ.get("OSWORLD_LOG_DIR", "logs"),',
@@ -124,6 +129,25 @@ def _qwen_runner(source: str) -> str:
     return source
 
 
+def _m3_runner(source: str) -> str:
+    source = _runner(source)
+    mount_argument = '    parser.add_argument("--vm_secret_mount", action="append", default=None)\n'
+    if mount_argument not in source:
+        anchor = '    parser.add_argument("--path_to_vm", type=str, default=None)\n'
+        if anchor not in source:
+            raise RuntimeError("M3 runner VM-path anchor not found; OSWorld contract moved")
+        source = source.replace(anchor, anchor + mount_argument, 1)
+    mount_forwarding = "            vm_secret_mounts=args.vm_secret_mount,\n"
+    if mount_forwarding not in source:
+        anchor = "            enable_proxy=args.enable_proxy,\n"
+        if anchor not in source:
+            raise RuntimeError(
+                "M3 runner DesktopEnv constructor anchor not found; OSWorld contract moved"
+            )
+        source = source.replace(anchor, anchor + mount_forwarding, 1)
+    return source
+
+
 def _qwen_agent(source: str) -> str:
     compatible = "    def reset(self, _logger=None, vm_ip=None):\n"
     if compatible in source:
@@ -139,6 +163,7 @@ TRANSFORMS = {
     "desktop_env/desktop_env.py": _desktop_env,
     "mm_agents/qwen3vl_agent.py": _qwen_agent,
     "scripts/python/run_multienv.py": _runner,
+    "scripts/python/run_multienv_m3.py": _m3_runner,
     "scripts/python/run_multienv_qwen3vl.py": _qwen_runner,
 }
 

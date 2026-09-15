@@ -13,6 +13,10 @@ from pathlib import Path
 
 def main() -> int:
     print("ARGS", " ".join(sys.argv))
+    if os.environ.get("FAKE_ECHO_ENV"):
+        print("SECRET", os.environ.get("ANTHROPIC_API_KEY", ""))
+    if os.environ.get("FAKE_ECHO_PYTHONPATH"):
+        print("PYTHONPATH", os.environ.get("PYTHONPATH", ""))
     parser = argparse.ArgumentParser()
     parser.add_argument("--provider_name")
     parser.add_argument("--path_to_vm")
@@ -43,6 +47,10 @@ def main() -> int:
     output = args.result_dir / "pyautogui" / "screenshot" / "fake" / domain / task_id
     output.mkdir(parents=True, exist_ok=True)
     (output / "traj.jsonl").write_text(json.dumps({"task": task_id}) + "\n")
+    if os.environ.get("FAKE_WRITE_SECRET_ARTIFACT"):
+        (output / "args.json").write_text(
+            json.dumps({"api_key": os.environ.get("ANTHROPIC_API_KEY", "")}) + "\n"
+        )
     if outcome in {"success", "cleanup_failed"}:
         (output / "result.txt").write_text("0.5\n")
     elif outcome == "zero":
